@@ -1,0 +1,44 @@
+# pluginCategories.json is the single source of truth for categories, but two places
+# keep a hand copy that nothing keeps honest:
+#
+#   - the Issue Form dropdown (static YAML — Issue Forms cannot fetch anything)
+#   - the guided page's offline fallback list
+#
+# Add a category upstream and those copies silently go stale — the form would offer a
+# list that no longer matches reality, with no error anywhere. This check is what stops
+# that. It runs on any PR touching either the truth or a copy.
+
+name: Check category drift
+
+on:
+  pull_request:
+    paths:
+      - "pluginCategories.json"
+      - ".github/ISSUE_TEMPLATE/plugin-submission.yml"
+      - "docs/contact/index.html"
+      - ".github/scripts/check_category_drift.py"
+      - ".github/workflows/check-category-drift.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install dependencies
+        run: pip install --quiet pyyaml
+
+      - name: Compare category copies against pluginCategories.json
+        run: |
+          python .github/scripts/check_category_drift.py \
+            --categories pluginCategories.json \
+            --form .github/ISSUE_TEMPLATE/plugin-submission.yml \
+            --page docs/contact/index.html

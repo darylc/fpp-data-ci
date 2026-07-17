@@ -1,0 +1,138 @@
+# GitHub Issue Form — "Submit a plugin".
+#
+# WHAT THIS IS: a structured intake form. When someone clicks "New issue" in the
+# fpp-data repo, GitHub renders these fields instead of a blank text box. The result
+# is a normal issue whose body is filled from the answers, so maintainers get a clean,
+# consistent triage queue (mirrors Bitfocus Companion's module-request tracker).
+#
+# WHERE IT LIVES: FalconChristmas/fpp-data/.github/ISSUE_TEMPLATE/plugin-submission.yml
+# DOCS: https://docs.github.com/issues/tracking-your-work-with-issues/using-templates/syntax-for-githubs-form-schema
+#
+# NOTE ON THE CATEGORY DROPDOWN: Issue Forms are static — they can't read
+# pluginCategories.json at render time. The 10 options below are a hand-kept COPY of
+# the short names in pluginCategories.json (which stays the single source of truth).
+# A CI check (validate-pluginlist) asserts these two lists still match so they can't drift.
+
+name: Submit a plugin
+description: Add your plugin to FPP's Plugin Manager list (pluginList.json).
+title: "[Plugin] <your-repoName>"
+labels: ["plugin", "submission"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for contributing a plugin to FPP! This form is the easy path — you don't
+        need to know git. A maintainer reviews the submission and adds it to the list.
+
+        **Before you start**, please read the
+        [Contribution Guidelines](https://github.com/FalconChristmas/fpp-data/blob/master/CONTRIBUTING.md)
+        and make sure your plugin ships a valid `pluginInfo.json`
+        (see [fpp-plugin-Template](https://github.com/FalconChristmas/fpp-plugin-Template)).
+
+  - type: input
+    id: display_name
+    attributes:
+      label: Plugin display name
+      description: The human-friendly name shown in the Plugin Manager (e.g. "Announcement Assistant").
+      placeholder: Announcement Assistant
+    validations:
+      required: true
+
+  - type: input
+    id: repo_name
+    attributes:
+      label: repoName
+      description: >
+        The exact `repoName` from your `pluginInfo.json`. It must match your GitHub repo
+        name and is used as the entry's key in the list.
+      placeholder: fpp-AnnouncementAssistant
+    validations:
+      required: true
+
+  - type: input
+    id: plugininfo_url
+    attributes:
+      label: pluginInfo.json raw URL
+      description: >
+        The raw.githubusercontent.com URL to your `pluginInfo.json`. This is the pointer
+        that goes into pluginList.json.
+      placeholder: https://raw.githubusercontent.com/<you>/<repo>/refs/heads/main/pluginInfo.json
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: >
+        Which category best fits your plugin? (Copied from pluginCategories.json — the
+        canonical list. If none fit well, pick the closest and mention it below.)
+      options:
+        - Audio
+        - Interaction
+        - Payments
+        - Messaging
+        - Data Feeds
+        - Home Automation
+        - Notifications
+        - Hardware
+        - Display & Video
+        - Monitoring
+    validations:
+      required: true
+
+  - type: input
+    id: description
+    attributes:
+      label: One-line description
+      description: A single sentence describing what your plugin does.
+      placeholder: Play pre-canned announcements over the show audio with automatic ducking.
+    validations:
+      required: true
+
+  - type: input
+    id: author_handle
+    attributes:
+      label: Your GitHub handle
+      description: >
+        Used to contact you if changes are needed (we @mention/assign you on GitHub —
+        no email is collected or stored).
+      placeholder: "@yourhandle"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: acknowledgements
+    attributes:
+      label: Acknowledgements
+      description: >
+        These mirror the Contribution Guidelines. All are required — please confirm each.
+      options:
+        - label: I tested this plugin on the latest released version of FPP **and** the current nightly build.
+          required: true
+        - label: My repository includes a license.
+          required: true
+        - label: My plugin creates at most **one** menu item in each FPP menu and follows FPP UI conventions.
+          required: true
+        - label: My plugin does not interfere with core FPP functionality, stability, or real-time sequence playback, and installs cleanly (or refuses with an explanation) on hardware it can't support.
+          required: true
+        - label: My plugin is not malicious and does not exfiltrate data or run unexpected remote code.
+          required: true
+        - label: I understand inclusion is at the FPP developers' discretion and is not guaranteed.
+          required: true
+
+  - type: checkboxes
+    id: announced
+    attributes:
+      label: Community announcement
+      options:
+        - label: I have announced this plugin to the FPP community (e.g. the FPP Facebook group) and considered feedback.
+          required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else? (optional)
+      description: Dependencies, platform limitations, or notes for the reviewer.
+    validations:
+      required: false

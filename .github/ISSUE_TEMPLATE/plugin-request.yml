@@ -1,0 +1,51 @@
+# GitHub Issue Form — "Request a plugin".
+# A lightweight wishlist form: "I wish a plugin existed that does X." It feeds the same
+# triage queue as submissions (label: plugin) but is clearly a request, not a submission.
+# Mirrors Bitfocus Companion's separate "module request" path.
+
+name: Request a plugin
+description: Suggest a plugin idea you'd like someone to build.
+title: "[Request] <short summary>"
+labels: ["plugin", "request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea for a plugin but can't build it yourself? Describe it here. This is a
+        wishlist — there's no guarantee anyone picks it up, but it helps developers see demand.
+
+  - type: input
+    id: summary
+    attributes:
+      label: What should the plugin do?
+      description: One sentence.
+      placeholder: Show live weather radar on a matrix panel.
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: What problem does it solve? Any existing tools or services it would talk to?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Rough category
+      options:
+        - Audio
+        - Interaction
+        - Payments
+        - Messaging
+        - Data Feeds
+        - Home Automation
+        - Notifications
+        - Hardware
+        - Display & Video
+        - Monitoring
+        - Not sure
+    validations:
+      required: false

@@ -1,0 +1,15 @@
+# Controls the "New issue" chooser screen for the fpp-data repo.
+# - blank_issues_enabled: false  -> people must pick a template (keeps the queue structured).
+# - contact_links               -> extra buttons shown on the chooser that link out instead
+#                                  of opening an issue.
+blank_issues_enabled: false
+contact_links:
+  - name: Contribution Guidelines
+    url: https://github.com/FalconChristmas/fpp-data/blob/master/CONTRIBUTING.md
+    about: Read this before submitting — schema, categories, and review policy.
+  - name: FPP Facebook Group
+    url: https://www.facebook.com/groups/1554782254796752
+    about: Announce your plugin and get community feedback first.
+  - name: FPP Plugin Template
+    url: https://github.com/FalconChristmas/fpp-plugin-Template
+    about: A working example plugin with a valid pluginInfo.json to copy from.

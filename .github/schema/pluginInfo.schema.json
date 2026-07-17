@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/FalconChristmas/fpp-data/master/.github/schema/pluginInfo.schema.json",
+  "title": "FPP pluginInfo.json",
+  "description": "Metadata file each FPP plugin ships at its repo root. Referenced by pluginList.json.",
+  "type": "object",
+  "required": [
+    "repoName",
+    "name",
+    "author",
+    "description",
+    "homeURL",
+    "srcURL",
+    "bugURL",
+    "versions"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "repoName": {
+      "type": "string",
+      "description": "Unique key; must match the plugin's GitHub repo name and its pluginList.json entry name.",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-friendly display name shown in the Plugin Manager.",
+      "minLength": 1
+    },
+    "author": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "homeURL": {
+      "type": "string",
+      "description": "Human-facing project/home page.",
+      "format": "uri",
+      "pattern": "^https?://"
+    },
+    "srcURL": {
+      "type": "string",
+      "description": "The URL FPP clones from at install time (this is the trust anchor for the Official badge).",
+      "format": "uri",
+      "pattern": "^https?://"
+    },
+    "bugURL": {
+      "type": "string",
+      "description": "Where users report bugs (usually the repo's /issues page).",
+      "format": "uri",
+      "pattern": "^https?://"
+    },
+    "allowUpdates": {
+      "description": "1/true if the Plugin Manager may offer updates.",
+      "type": ["integer", "boolean"]
+    },
+    "private": {
+      "description": "Set truthy if the repo is private (skips the public-repo check).",
+      "type": ["integer", "boolean"]
+    },
+    "versions": {
+      "type": "array",
+      "description": "One entry per supported FPP version range. Must be non-empty.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["minFPPVersion", "branch"],
+        "additionalProperties": true,
+        "properties": {
+          "minFPPVersion": {
+            "type": "string",
+            "description": "Lowest FPP version this entry supports, e.g. \"10.0\".",
+            "pattern": "^[0-9]+(\\.[0-9]+)*$"
+          },
+          "maxFPPVersion": {
+            "type": "string",
+            "description": "Highest supported FPP version, or \"0\" for open-ended.",
+            "pattern": "^[0-9]+(\\.[0-9]+)*$"
+          },
+          "branch": {
+            "type": "string",
+            "description": "Git branch to install for this version range.",
+            "minLength": 1
+          },
+          "sha": {
+            "type": "string",
+            "description": "Optional pinned commit SHA for provenance (recommended). Empty string = track branch tip."
+          },
+          "dependencies": {
+            "type": "object",
+            "description": "Optional. Deps FPP resolves before running the plugin's own fpp_install.sh.",
+            "additionalProperties": true,
+            "properties": {
+              "packages": {
+                "type": "array",
+                "description": "apt package names (ref-counted by FPP).",
+                "items": { "type": "string" }
+              },
+              "scripts": {
+                "type": "array",
+                "description": "Entries from FPP's script repository (Category/file).",
+                "items": { "type": "string" }
+              },
+              "plugins": {
+                "type": "array",
+                "description": "Other plugin repoNames this plugin depends on.",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -95,9 +95,36 @@ body:
     attributes:
       label: Your GitHub handle
       description: >
-        Used to contact you if changes are needed (we @mention/assign you on GitHub —
-        no email is collected or stored).
+        Used to @mention/assign you on this issue if changes are needed.
       placeholder: "@yourhandle"
+    validations:
+      required: true
+
+  # CONTACT TOKEN — the ONLY way an email reaches FPP. Never ask for a plain address
+  # here: this issue is PUBLIC the instant it's submitted (notifications, API, edit
+  # history), so a plaintext address would leak immediately and redaction is too late.
+  # The token is encrypted in the submitter's browser; only FPP's private contacts repo
+  # holds the key. See docs/contact/index.html.
+  #
+  # SANDBOX URL BELOW — swap to https://falconchristmas.github.io/fpp-data/contact/
+  # when promoting upstream.
+  - type: textarea
+    id: contact_token
+    attributes:
+      label: Contact token
+      description: >
+        FPP maintainers need a way to reach you about your plugin — a security issue, a
+        breaking change in a future FPP release, or a question before merging.
+        **Do not type your email here — this issue is public.**
+        Instead, generate an encrypted token at
+        **https://darylc.github.io/fpp-data-ci/contact/**
+        and paste the whole `FPPC1:` block below. It's encrypted in your browser, so only
+        FPP maintainers can read it — it is meaningless to anyone else reading this issue.
+      placeholder: |
+        FPPC1:
+        JbKch9EvKbnr1VmMrJS3hqrxP3Q+RD22azOvS3uUIbR8Wl0wWXL8YdKgZ3H4VJM69Z5yx8kc
+        ...
+      render: text
     validations:
       required: true
 

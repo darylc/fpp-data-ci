@@ -24,8 +24,10 @@ permissions:
 
 jobs:
   check:
-    # Only look at plugin submissions.
-    if: contains(join(github.event.issue.labels.*.name, ','), 'submission')
+    # Identify submissions by BODY SHAPE, not by label. GitHub silently drops labels
+    # declared in an issue template when they don't exist in the repo — a label filter
+    # here would mean this guard never runs and nobody notices.
+    if: contains(github.event.issue.body, '### Contact token')
     runs-on: ubuntu-latest
     steps:
       - name: Inspect the contact token

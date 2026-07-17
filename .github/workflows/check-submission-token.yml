@@ -39,8 +39,16 @@ jobs:
             const body = context.payload.issue.body || '';
 
             // Issue Forms render as '### Label\n\nvalue'. Pull the token field out.
-            const m = body.match(/^###\s+Contact token[^\n]*\s*$\n+([\s\S]*?)(?=^###\s|\Z)/m);
-            let val = (m ? m[1] : '').trim();
+            // NOTE: no \Z here — JavaScript regex has no \Z (that's Python). Using it
+            // matches a literal "Z", the match fails, and EVERY issue silently looks
+            // like it has no token. Split on the headings instead; it can't rot.
+            let val = '';
+            for (const section of body.split(/^###\s+/m)) {
+              if (/^Contact token/i.test(section)) {
+                val = section.replace(/^[^\n]*\n/, '').trim();   // drop the heading line
+                break;
+              }
+            }
             const fence = val.match(/^```[a-zA-Z]*\n([\s\S]*?)\n?```$/);
             if (fence) val = fence[1].trim();
 

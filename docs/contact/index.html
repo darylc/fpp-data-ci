@@ -126,9 +126,16 @@ const PUBLIC_JWK = {
   ]
 };
 
-// Mirrors the dropdown in plugin-submission.yml, which mirrors pluginCategories.json
-// (the single source of truth). A CI drift check keeps these three in step.
-const CATEGORIES = ["Audio", "Interaction", "Payments", "Messaging", "Data Feeds",
+// Categories are fetched live from pluginCategories.json — the single source of truth —
+// so adding a category upstream needs no change here. raw.githubusercontent.com sends
+// permissive CORS headers, so the browser fetch is allowed.
+const CATEGORIES_URL =
+  "https://raw.githubusercontent.com/FalconChristmas/fpp-data/master/pluginCategories.json";
+
+// Fallback only — used if the fetch fails (offline/rate-limited). Kept in sync by a CI
+// drift check. The Issue Form's dropdown CANNOT do this (static YAML, no JS), so that
+// list stays a hand-kept copy and the drift check is what stops all three diverging.
+const CATEGORIES_FALLBACK = ["Audio", "Interaction", "Payments", "Messaging", "Data Feeds",
                     "Home Automation", "Notifications", "Hardware", "Display & Video", "Monitoring"];
 // ---------------------------------------------------------------------------
 
@@ -137,8 +144,32 @@ const $ = (id) => document.getElementById(id);
 const setMsg = (el, text, cls) => { el.textContent = text; el.className = "msg" + (cls ? " " + cls : ""); };
 
 const sel = $("category");
-sel.append(new Option("— choose —", ""));
-for (const c of CATEGORIES) sel.append(new Option(c, c));
+
+function fillCategories(list) {
+  sel.replaceChildren();
+  sel.append(new Option("— choose —", ""));
+  for (const c of list) sel.append(new Option(c, c));
+}
+
+// Show the fallback immediately so the form is usable even before/without the fetch.
+fillCategories(CATEGORIES_FALLBACK);
+
+(async () => {
+  try {
+    const res = await fetch(CATEGORIES_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    // Tolerate either a bare array or a wrapper object, and either field name.
+    const arr = Array.isArray(data) ? data
+              : (data.categories || data.pluginCategories || []);
+    const names = arr.map(c => (typeof c === "string" ? c : (c.name || c.shortName)))
+                     .filter(Boolean);
+    if (names.length) fillCategories(names);
+  } catch (e) {
+    // Non-fatal: the fallback list is already in the dropdown.
+    console.warn("category fetch failed, using built-in list:", e.message);
+  }
+})();
 
 function b64(bytes) {
   let s = "";

@@ -4,6 +4,14 @@
 #                                  of opening an issue.
 blank_issues_enabled: false
 contact_links:
+  # The guided path. It encrypts the author's email in-browser and hands back a
+  # PRE-FILLED link to the "Submit a plugin" form below, so nothing is copy-pasted.
+  # Issue Forms are static YAML and cannot run JS, which is why this is a separate
+  # page rather than a step inside the form itself.
+  # SANDBOX URL — swap to https://falconchristmas.github.io/fpp-data/contact/ upstream.
+  - name: ⚡ Submit a plugin — start here (guided)
+    url: https://darylc.github.io/fpp-data-ci/contact/
+    about: Recommended. Fills in the submission form for you and encrypts your contact email.
   - name: Contribution Guidelines
     url: https://github.com/FalconChristmas/fpp-data/blob/master/CONTRIBUTING.md
     about: Read this before submitting — schema, categories, and review policy.

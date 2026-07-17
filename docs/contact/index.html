@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>FPP Plugin — Contact Token Generator</title>
+<title>Submit a plugin — Falcon Player</title>
 <style>
   :root { color-scheme: light dark; --fg:#1a1a1a; --bg:#fff; --muted:#5a5a5a;
           --line:#d8d8d8; --accent:#0969da; --ok:#1a7f37; --err:#cf222e; --code:#f6f8fa; }
@@ -21,16 +21,16 @@
   fieldset { border:1px solid var(--line); border-radius:8px; padding:1.25rem; margin:0 0 1.25rem; }
   legend { padding:0 .4rem; font-weight:600; font-size:.9rem; }
   label { display:block; font-weight:600; margin:.9rem 0 .3rem; font-size:.9rem; }
+  label:first-of-type { margin-top:.2rem; }
   .hint { font-weight:400; color:var(--muted); font-size:.85rem; }
-  input, textarea { width:100%; padding:.6rem .7rem; border:1px solid var(--line); border-radius:6px;
-                    background:var(--bg); color:var(--fg); font-size:1rem; font-family:inherit; }
-  textarea { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.8rem; min-height:8rem; resize:vertical; }
-  button { margin-top:1.1rem; padding:.6rem 1.1rem; border:0; border-radius:6px; background:var(--accent);
-           color:#fff; font-size:1rem; font-weight:600; cursor:pointer; }
+  input, select, textarea { width:100%; padding:.6rem .7rem; border:1px solid var(--line);
+        border-radius:6px; background:var(--bg); color:var(--fg); font-size:1rem; font-family:inherit; }
+  button, .btn { margin-top:1.1rem; padding:.6rem 1.1rem; border:0; border-radius:6px;
+         background:var(--accent); color:#fff; font-size:1rem; font-weight:600; cursor:pointer;
+         display:inline-block; text-decoration:none; text-align:center; }
   button:disabled { opacity:.5; cursor:not-allowed; }
-  button.secondary { background:transparent; color:var(--accent); border:1px solid var(--line); }
-  #out { display:none; }
-  #out.show { display:block; }
+  #step2 { display:none; }
+  #step2.show { display:block; }
   .msg { margin-top:.8rem; font-size:.9rem; }
   .msg.err { color:var(--err); }
   .msg.ok { color:var(--ok); }
@@ -38,56 +38,83 @@
           padding:.9rem 1rem; font-size:.9rem; color:var(--muted); }
   .note strong { color:var(--fg); }
   code { background:var(--code); padding:.1rem .3rem; border-radius:4px; font-size:.85em; }
-  .row { display:flex; gap:.6rem; flex-wrap:wrap; }
-  .row button { flex:0 0 auto; }
+  details { margin-top:1rem; font-size:.85rem; color:var(--muted); }
+  summary { cursor:pointer; }
+  textarea#tokenOut { font-family:ui-monospace, SFMono-Regular, Menlo, monospace;
+                      font-size:.75rem; min-height:6rem; margin-top:.5rem; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Contact Token Generator</h1>
-  <p class="sub">For submitting a plugin to the Falcon Player plugin list.</p>
+  <h1>Submit a plugin to FPP</h1>
+  <p class="sub">Fill this in, and we'll hand you a pre-filled GitHub issue to submit.</p>
 
   <p class="note">
-    FPP maintainers need a way to reach you about your plugin — a security problem, a breaking change
-    in a future FPP release, or a question before merging. <strong>Your email is never posted
-    publicly.</strong> This page encrypts it <strong>in your browser</strong> so that only FPP
-    maintainers can read it. The scrambled text you get back is what goes in the public issue —
-    it's meaningless to anyone else.
+    Your <strong>email is encrypted in this page, in your browser</strong>, before it goes anywhere.
+    Only FPP maintainers can read it — it never appears publicly on the GitHub issue.
+    Everything else you enter here is public, as it's part of the plugin listing.
   </p>
 
   <fieldset>
-    <legend>1 · Your details</legend>
+    <legend>Your plugin</legend>
 
-    <label for="repo">Plugin repository name
-      <span class="hint">— exactly as in your submission, e.g. <code>fpp-brightness</code></span>
-    </label>
-    <input id="repo" type="text" autocomplete="off" spellcheck="false" placeholder="fpp-my-plugin">
+    <label for="display_name">Plugin display name
+      <span class="hint">— shown in the Plugin Manager</span></label>
+    <input id="display_name" type="text" autocomplete="off" placeholder="Announcement Assistant">
+
+    <label for="repo_name">repoName
+      <span class="hint">— must match the <code>repoName</code> in your pluginInfo.json</span></label>
+    <input id="repo_name" type="text" autocomplete="off" spellcheck="false" placeholder="fpp-AnnouncementAssistant">
+
+    <label for="plugininfo_url">pluginInfo.json raw URL</label>
+    <input id="plugininfo_url" type="url" autocomplete="off" spellcheck="false"
+           placeholder="https://raw.githubusercontent.com/you/repo/refs/heads/main/pluginInfo.json">
+
+    <label for="category">Category</label>
+    <select id="category"></select>
+
+    <label for="description">One-line description</label>
+    <input id="description" type="text" autocomplete="off"
+           placeholder="Play pre-canned announcements over the show audio.">
+
+    <label for="author_handle">Your GitHub handle</label>
+    <input id="author_handle" type="text" autocomplete="off" spellcheck="false" placeholder="@yourhandle">
 
     <label for="email">Contact email
-      <span class="hint">— goes to FPP maintainers only</span>
-    </label>
+      <span class="hint">— encrypted here; visible only to FPP maintainers</span></label>
     <input id="email" type="email" autocomplete="off" spellcheck="false" placeholder="you@example.com">
 
-    <button id="go">Generate token</button>
+    <button id="go">Encrypt &amp; continue</button>
     <div id="msg" class="msg"></div>
   </fieldset>
 
-  <fieldset id="out">
-    <legend>2 · Copy this into the issue form</legend>
-    <p class="hint" style="margin:.2rem 0 .6rem">
-      Paste this whole block into the <strong>Contact token</strong> field. Don't edit it.
+  <fieldset id="step2">
+    <legend>Almost done</legend>
+    <p style="margin:.2rem 0 0">
+      Your details are ready. The button below opens a GitHub issue with everything
+      <strong>already filled in</strong> — tick the acknowledgements there and submit.
     </p>
-    <textarea id="token" readonly spellcheck="false"></textarea>
-    <div class="row">
-      <button id="copy" class="secondary" type="button">Copy to clipboard</button>
-    </div>
-    <div id="copymsg" class="msg"></div>
+    <a id="continue" class="btn" href="#" rel="noopener">Continue on GitHub →</a>
+    <div class="msg hint" id="fallbackMsg"></div>
+
+    <details>
+      <summary>Not working? Copy the token manually</summary>
+      <p>Open the <a id="plainLink" href="#">plain issue form</a> and paste this into
+         <strong>Contact token</strong>:</p>
+      <textarea id="tokenOut" readonly spellcheck="false"></textarea>
+    </details>
   </fieldset>
 </main>
 
 <script>
-// Public key — safe to publish. The matching private key exists only as an Actions
-// secret on FPP's private contacts repo, so only maintainers can decrypt.
+// ---------------------------------------------------------------------------
+// CONFIG
+// SANDBOX VALUES — swap REPO to FalconChristmas/fpp-data when promoting upstream.
+const REPO = "darylc/fpp-data-ci";
+const TEMPLATE = "plugin-submission.yml";
+
+// Public key — safe to publish. The private key exists only as an Actions secret on
+// FPP's private contacts repo, so only maintainers can decrypt.
 const PUBLIC_JWK = {
   "kty": "RSA",
   "n": "nHbDZjS1JDfRBEgK02APtc5pzTHFaAF4kqZlQaRYizebiE68fEvkzOkNm_FYkZBmGat9_UUVduyPc-98zIayVH9bnIz01WdH3jmSK46V7cqL6Cz6IL8ZXKSHlLIkO-2_A2nooLO2gThTtClAAlM8RctC0QhqC972VilNW5uj5cp_dlxc845TumRNM6l55LKuL--3F8gxBU1n6gPcgvxto7HVfhDEKCRa4iC5aQZl8ua1ZzIGcPKmiSPYIa6n3mETfXffxJo8-S_J2QAWMW-4ta5S0rgaIu0GZvBNQ5Pm7LiQ_Vg_Bf1zvyakZUVSN_NzcZHkeIczHY_y7w_DfiMab6SEo2b_lcw81wX89o85s5ALIaedy6pkx1aA0D8YmCqI4Svw_qVZ8o2lU3tGbIsNMqd1ww1Co1nDqP_zBOGHAzmtw25UX1p6BpTWE_mh37IcVcfFKYkqYWMNf8WrPwTlcAKddfsdeXdw237hq-czIAC7qrLpfn_vKDzUwqLrEeav0DJurhOGeMP-PxgOYHKB4-egynne9wJLNkbxJwxHHl-nl3hzJ6LfU6sWchN_DWs4ubifepX5rtqySAilSHm2y-zw02SCbdhQ96G-xjzCHe7c1HTctgowRJwCkSRQ10EqfP5ALHHVA4B0HoaKOnjMno9sfHmeJlwiKs0ITa1MPzM",
@@ -99,28 +126,44 @@ const PUBLIC_JWK = {
   ]
 };
 
-const PREFIX = "FPPC1:";           // token format marker, v1
-const $ = (id) => document.getElementById(id);
+// Mirrors the dropdown in plugin-submission.yml, which mirrors pluginCategories.json
+// (the single source of truth). A CI drift check keeps these three in step.
+const CATEGORIES = ["Audio", "Interaction", "Payments", "Messaging", "Data Feeds",
+                    "Home Automation", "Notifications", "Hardware", "Display & Video", "Monitoring"];
+// ---------------------------------------------------------------------------
 
-function setMsg(el, text, cls) { el.textContent = text; el.className = "msg" + (cls ? " " + cls : ""); }
+const PREFIX = "FPPC1:";
+const $ = (id) => document.getElementById(id);
+const setMsg = (el, text, cls) => { el.textContent = text; el.className = "msg" + (cls ? " " + cls : ""); };
+
+const sel = $("category");
+sel.append(new Option("— choose —", ""));
+for (const c of CATEGORIES) sel.append(new Option(c, c));
 
 function b64(bytes) {
   let s = "";
   for (const b of new Uint8Array(bytes)) s += String.fromCharCode(b);
   return btoa(s);
 }
-
-// Wrap at 72 cols so the blob doesn't render as one endless line in the issue.
 const wrap = (s) => s.replace(/(.{72})/g, "$1\n").trim();
 
-async function generate() {
-  const repo = $("repo").value.trim();
-  const email = $("email").value.trim();
-  const msg = $("msg");
+// Fields that go straight onto the public issue, mapped to the form's field ids.
+const PUBLIC_FIELDS = ["display_name", "repo_name", "plugininfo_url", "category", "description", "author_handle"];
 
-  if (!repo) return setMsg(msg, "Enter your plugin repository name.", "err");
-  if (!/^[A-Za-z0-9._-]+$/.test(repo))
-    return setMsg(msg, "Repository name looks wrong — use just the repo name, not a URL.", "err");
+async function generate() {
+  const msg = $("msg");
+  const v = Object.fromEntries(PUBLIC_FIELDS.map(f => [f, $(f).value.trim()]));
+  const email = $("email").value.trim();
+
+  for (const [id, label] of [["display_name","display name"], ["repo_name","repoName"],
+                             ["plugininfo_url","pluginInfo.json URL"], ["category","category"],
+                             ["description","description"], ["author_handle","GitHub handle"]]) {
+    if (!v[id]) return setMsg(msg, `Please fill in the ${label}.`, "err");
+  }
+  if (!/^[A-Za-z0-9._-]+$/.test(v.repo_name))
+    return setMsg(msg, "repoName should be just the repo name, not a URL.", "err");
+  if (!/^https?:\/\//.test(v.plugininfo_url))
+    return setMsg(msg, "The pluginInfo.json URL must start with http(s)://", "err");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     return setMsg(msg, "That doesn't look like an email address.", "err");
 
@@ -129,34 +172,36 @@ async function generate() {
     const key = await crypto.subtle.importKey(
       "jwk", PUBLIC_JWK, { name: "RSA-OAEP", hash: "SHA-256" }, false, ["encrypt"]
     );
-    // The repo name is encrypted alongside the email so a token copied from someone
-    // else's public issue can't be replayed against a different plugin.
-    const payload = JSON.stringify({ v: 1, repo, email, ts: new Date().toISOString() });
-    const ct = await crypto.subtle.encrypt(
-      { name: "RSA-OAEP" }, key, new TextEncoder().encode(payload)
-    );
-    $("token").value = PREFIX + "\n" + wrap(b64(ct));
-    $("out").classList.add("show");
-    setMsg(msg, "Done — copy the token below.", "ok");
-    $("out").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    // repo is encrypted alongside the email so a token lifted from someone else's
+    // public issue can't be replayed against a different plugin.
+    const payload = JSON.stringify({ v: 1, repo: v.repo_name, email, ts: new Date().toISOString() });
+    const ct = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, key,
+                                           new TextEncoder().encode(payload));
+    const token = PREFIX + "\n" + wrap(b64(ct));
+
+    // Issue Forms prefill from query params keyed by field id. Checkboxes can't be
+    // prefilled — the acknowledgements stay on GitHub, ticked deliberately.
+    const qs = new URLSearchParams({ template: TEMPLATE, ...v, contact_token: token });
+    const url = `https://github.com/${REPO}/issues/new?${qs}`;
+
+    $("continue").href = url;
+    $("plainLink").href = `https://github.com/${REPO}/issues/new?template=${TEMPLATE}`;
+    $("tokenOut").value = token;
+    $("step2").classList.add("show");
+    setMsg(msg, "Encrypted.", "ok");
+    // Very long URLs can be refused by some browsers; warn rather than fail silently.
+    setMsg($("fallbackMsg"),
+           url.length > 7000 ? "If GitHub shows an error, use the manual option below." : "");
+    $("step2").scrollIntoView({ behavior: "smooth", block: "nearest" });
   } catch (e) {
     setMsg(msg, "Encryption failed: " + e.message, "err");
   }
 }
 
 $("go").addEventListener("click", generate);
-$("copy").addEventListener("click", async () => {
-  try {
-    await navigator.clipboard.writeText($("token").value);
-    setMsg($("copymsg"), "Copied.", "ok");
-  } catch {
-    $("token").select();
-    setMsg($("copymsg"), "Press Ctrl/Cmd+C to copy.", "");
-  }
-});
 
 if (!crypto?.subtle) {
-  setMsg($("msg"), "This browser can't encrypt here (needs a secure context). Open this page over https.", "err");
+  setMsg($("msg"), "This browser can't encrypt here (needs a secure context — open this page over https).", "err");
   $("go").disabled = true;
 }
 </script>

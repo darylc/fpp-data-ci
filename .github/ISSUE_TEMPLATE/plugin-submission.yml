@@ -111,15 +111,20 @@ body:
   - type: textarea
     id: contact_token
     attributes:
-      label: Contact token
+      label: Contact token (encrypted email)
       description: >
-        FPP maintainers need a way to reach you about your plugin — a security issue, a
-        breaking change in a future FPP release, or a question before merging.
-        **Do not type your email here — this issue is public.**
-        Instead, generate an encrypted token at
-        **https://darylc.github.io/fpp-data-ci/contact/**
-        and paste the whole `FPPC1:` block below. It's encrypted in your browser, so only
-        FPP maintainers can read it — it is meaningless to anyone else reading this issue.
+        **Already filled in? Leave it as-is** — you're done here, skip to the checkboxes.
+
+
+        Empty? Get your token from the
+        **[guided submission page](https://darylc.github.io/fpp-data-ci/contact/)** and paste
+        the whole `FPPC1:` block here.
+
+
+        ⚠️ **Never type your email address here — this issue is public the moment you submit
+        it.** The token is your email encrypted in your browser, readable only by FPP
+        maintainers. It's how we reach you about a security problem, a breaking change in a
+        future FPP release, or a question before merging.
       placeholder: |
         FPPC1:
         JbKch9EvKbnr1VmMrJS3hqrxP3Q+RD22azOvS3uUIbR8Wl0wWXL8YdKgZ3H4VJM69Z5yx8kc

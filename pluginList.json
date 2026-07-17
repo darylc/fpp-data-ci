@@ -65,6 +65,8 @@
             [ "fpp-servo-calibrator", "https://raw.githubusercontent.com/pgianotto/fpp-servo-calibrator/master/pluginInfo.json", "Hardware" ],
             [ "fpp-live-follow", "https://raw.githubusercontent.com/pgianotto/fpp-live-follow/master/pluginInfo.json", "Interaction" ],
             [ "fpp-performance-capture", "https://raw.githubusercontent.com/pgianotto/animatronic-motion-system/master/pluginInfo.json", "Hardware" ],
-            [ "fpp-SETIQ", "https://raw.githubusercontent.com/diaquas/fpp-SETIQ/main/pluginInfo.json", "Interaction" ]
+            [ "fpp-SETIQ", "https://raw.githubusercontent.com/diaquas/fpp-SETIQ/main/pluginInfo.json", "Interaction" ],
+            [ "fpp-BrokenTestPlugin", "https://raw.githubusercontent.com/darylc/definitely-not-a-real-repo-xyz/master/pluginInfo.json", "Sparkles" ],
+            [ "fpp-brightness", "https://raw.githubusercontent.com/jcrossbdn/fpp-brightness/master/pluginInfo.json", "Monitoring" ]
         ]
 }

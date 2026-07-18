@@ -9,12 +9,21 @@
 #
 # Runs on the PUBLIC repo and only ever reads/clones the submitter's own public repo —
 # holds no secrets beyond the default GITHUB_TOKEN used to comment/label.
+#
+# RESCANNING: the fix for a failed scan almost always lives in the submitter's OWN
+# repo, not the issue body — so "edit the issue to re-trigger" (which does work, since
+# this also listens for `edited`) isn't the natural way anyone asks for a re-check.
+# Same problem, same solution as delist-verify.yml: a comment containing `/recheck`
+# re-runs the scan against the (unchanged) issue body, re-fetching pluginInfo.json and
+# re-cloning the repo fresh each time so it sees whatever was just pushed.
 
 name: Scan new plugin submission
 
 on:
   issues:
     types: [opened, edited]
+  issue_comment:
+    types: [created]
 
 permissions:
   issues: write
@@ -22,8 +31,12 @@ permissions:
 jobs:
   scan:
     # Identify submissions by BODY SHAPE, not by label — see check-submission-token.yml
-    # for why label-based triggers silently no-op on this repo.
-    if: contains(github.event.issue.body, '### pluginInfo.json raw URL')
+    # for why label-based triggers silently no-op on this repo. For a comment trigger,
+    # only run on the actual `/recheck` command — otherwise every comment on a
+    # submission issue (including our own scan results) would re-run this.
+    if: >-
+      contains(github.event.issue.body, '### pluginInfo.json raw URL') &&
+      (github.event_name != 'issue_comment' || contains(github.event.comment.body, '/recheck'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -92,6 +105,7 @@ jobs:
                 if (f.severity === 'optional') continue;
                 msg.push(`- ${badge[f.severity] || ''} **${label[f.severity] || f.severity} — ${f.code}** — ${f.message}`);
               }
+              msg.push('', 'Push a fix to your repo, then comment `/recheck` here (no need to edit this issue) to re-run the scan.');
             }
             const optional = findings.filter(f => f.severity === 'optional');
             if (optional.length) {
@@ -117,4 +131,12 @@ jobs:
 
             if (!result.pass) {
               await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['needs-manual-review'] });
+            } else {
+              // Clear a stale label from an earlier failed scan — a passing /recheck
+              // shouldn't leave the issue looking stuck.
+              try {
+                await github.rest.issues.removeLabel({ owner, repo, issue_number, name: 'needs-manual-review' });
+              } catch (e) {
+                if (e.status !== 404) throw e;   // 404 = label wasn't there; fine
+              }
             }

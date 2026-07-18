@@ -126,8 +126,8 @@
           repo and runs the same compliance linter used for already-listed plugins — but a
           little stricter, since a new plugin doesn't get the grandfathering an existing one
           has. If it finds anything blocking, the comment tells you exactly what and where.</li>
-      <li><strong>If the scan asks for changes</strong>, fix your repo and edit the issue
-          (any edit, even just re-saving) to re-run the checks.</li>
+      <li><strong>If the scan asks for changes</strong>, push a fix to your repo, then comment
+          <code>/recheck</code> on the issue to re-run it — no need to edit the issue itself.</li>
       <li><strong>Once the checks pass, a maintainer still reviews it by hand</strong> —
           category fit, description wording, and anything the automation can't judge — before
           opening a pull request that adds your plugin to <code>pluginList.json</code>.</li>

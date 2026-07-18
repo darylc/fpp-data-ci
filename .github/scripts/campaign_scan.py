@@ -182,6 +182,12 @@ def issue_body(r, target):
         L.append(f"Maintainer: `{r['owner']}` (https://github.com/{r['owner']}) "
                  f"*(not @-mentioned in this dry run)*")
     L.append("")
+    if r["status"] == "unmaintained":
+        push = f"{r['months_since_push']} months" if r["months_since_push"] is not None else "a long time"
+        L.append(f"> 💤 No activity in {push} — if you'd like to retire this plugin instead of "
+                 f"updating it, please open a [de-list request]({DELIST_FORM}) and we'll remove it "
+                 f"from the list, no update needed.")
+        L.append("")
     # compatibility
     if r["certified"]:
         L.append(f"### ✅ Compatibility\nA `versions[]` entry already declares FPP {target} support.")

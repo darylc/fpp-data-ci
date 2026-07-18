@@ -89,27 +89,35 @@ jobs:
             const order = { blocker: 0, 'best-practice': 1, optional: 2 };
             const findings = [...result.findings].sort((a, b) => (order[a.severity] ?? 3) - (order[b.severity] ?? 3));
 
+            // Mention the reporter directly: unlike the bulk fpp<major> campaign scan
+            // (MENTION_OWNER = False in lib_plugin_schema.py — pinging every listed
+            // plugin's author unprompted would be spam), this is a direct reply to an
+            // issue the person just opened themselves asking for exactly this feedback.
+            const reporter = context.payload.issue.user.login;
+
             let msg;
             if (result.pass) {
               msg = ['### ✅ Automated compliance scan: passed',
                      '',
-                     'No blocking issues found. A maintainer will still review this by hand before it\'s added to `pluginList.json`.'];
+                     `@${reporter} no blocking issues found. A maintainer will still review this by hand before it's added to \`pluginList.json\`.`];
             } else {
               msg = ['### 🛑 Automated compliance scan: needs changes',
                      '',
-                     `Found ${result.num_blocking} issue(s) that must be fixed before this can be merged ` +
-                     '(new submissions are held to a stricter bar than already-listed plugins — ' +
-                     '`best-practice` findings block here too, not just `blocker`):',
+                     `@${reporter} found ${result.num_blocking} issue(s) that must be fixed before this can be merged:`,
                      ''];
               for (const f of findings) {
                 if (f.severity === 'optional') continue;
                 msg.push(`- ${badge[f.severity] || ''} **${label[f.severity] || f.severity} — ${f.code}** — ${f.message}`);
               }
-              msg.push('', 'Push a fix to your repo, then comment `/recheck` here (no need to edit this issue) to re-run the scan.');
+              msg.push('',
+                       '*New submissions are held to a stricter bar than already-listed plugins: ' +
+                       '`best-practice` findings block here too, not just `blocker`.*',
+                       '',
+                       'Push a fix to your repo, then comment `/recheck` here (no need to edit this issue) to re-run the scan.');
             }
             const optional = findings.filter(f => f.severity === 'optional');
             if (optional.length) {
-              msg.push('', '<details><summary>💡 Optional polish (not blocking)</summary>', '');
+              msg.push('', '<details open><summary>💡 Optional polish (not blocking)</summary>', '');
               for (const f of optional) msg.push(`- ${f.message}`);
               msg.push('', '</details>');
             }

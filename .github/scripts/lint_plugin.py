@@ -204,7 +204,13 @@ def lint_plugin_dir(root: str, repo_name: str | None = None) -> list[Finding]:
             body = _read(p)
             if not re.search(r'set\s+-e|set\s+-euo|\|\|\s*exit', body):
                 out.append(Finding(BEST_PRACTICE, "no-set-e",
-                           f"{cand} has no 'set -e'/error handling — a failed step half-installs"))
+                           f"{cand} has no 'set -e' (or `|| exit`) — without it, bash keeps running "
+                           f"the rest of the script even after a command fails, so if an earlier "
+                           f"step errors out (e.g. a dependency install fails), later steps still "
+                           f"run against that broken state and the plugin ends up half-installed "
+                           f"with no visible error. Add `set -e` (or `set -euo pipefail`) as the "
+                           f"first line after the shebang so the script stops immediately on the "
+                           f"first failure instead"))
             break
 
     # --- logging conventions -------------------------------------------------

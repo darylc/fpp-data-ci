@@ -4,7 +4,7 @@
 # the submitter, so we know their real login. This checks it against the plugin's
 # repo owner (from srcURL) and posts a sticky comment + a verdict label:
 #   owner-verified        submitter owns the repo (or it's archived/gone)
-#   ownership-unconfirmed  org repo / not the owner → asks for proof (delist:true)
+#   ownership-unconfirmed  org repo → asks for proof (delist:true), or /submit to override
 #   removal-error          couldn't resolve the plugin
 #
 # On `owner-verified` it goes straight on to remove the entry from
@@ -32,6 +32,16 @@
 # A comment containing `/recheck` re-runs verification against the (unchanged)
 # issue body -- e.g. useful after pushing delist:true, which this job can't
 # see until it re-fetches pluginInfo.json.
+#
+# OVERRIDING: if automated ownership verification won't confirm it (unconfirmed
+# or error) and the submitter believes that's wrong, `/submit` flags the issue
+# `needs-manual-review` for a maintainer to decide by hand instead — same idea
+# as scan-new-submission.yml's override, applied to the ownership question here
+# instead of a compliance scan.
+#
+# AUTHZ: /recheck and /submit only take effect from the issue's original
+# reporter — see the "Restrict..." step below. Anyone else gets told to open
+# their own request instead of being able to act on someone else's.
 
 name: Verify plugin removal ownership
 
@@ -48,14 +58,47 @@ permissions:
 jobs:
   verify:
     # Only for plugin-removal requests (the form applies this label), and for a
-    # comment trigger, only when it's actually the /recheck command -- otherwise
+    # comment trigger, only when it's actually /recheck or /submit -- otherwise
     # every comment on a removal-request issue would re-run this.
     if: >-
       contains(github.event.issue.labels.*.name, 'removal-request') &&
-      (github.event_name != 'issue_comment' || contains(github.event.comment.body, '/recheck'))
+      (github.event_name != 'issue_comment' ||
+       contains(github.event.comment.body, '/recheck') ||
+       contains(github.event.comment.body, '/submit'))
     runs-on: ubuntu-latest
     steps:
+      - name: Restrict /recheck and /submit to the original reporter
+        id: authz
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (context.eventName !== 'issue_comment') {
+              core.setOutput('ok', 'true');
+              core.setOutput('command', '');
+              return;
+            }
+            const commandUsed = context.payload.comment.body.includes('/submit') ? 'submit' : 'recheck';
+            core.setOutput('command', commandUsed);
+
+            const commenter = context.payload.comment.user.login;
+            const author = context.payload.issue.user.login;
+            if (commenter.toLowerCase() === author.toLowerCase()) {
+              core.setOutput('ok', 'true');
+              return;
+            }
+            core.setOutput('ok', 'false');
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.issue.number;
+            await github.rest.issues.createComment({
+              owner, repo, issue_number,
+              body: `⚠️ @${commenter} only the original reporter (**@${author}**) can use ` +
+                    `\`/${commandUsed}\` on this issue. If you'd like to request removal of your ` +
+                    `own plugin, please open a new request at ` +
+                    `https://darylc.github.io/fpp-data-ci/submit_remove_plugin/.`,
+            });
+
       - name: Check out fpp-data
+        if: steps.authz.outputs.ok == 'true'
         uses: actions/checkout@v4
 
       # Runs before verification (and is skipped entirely once the title already
@@ -63,6 +106,7 @@ jobs:
       # Guard against self-triggering: this API call itself fires another `edited`
       # event, but the no-op title comparison on that second run stops it there.
       - name: Set issue title from repoName
+        if: steps.authz.outputs.ok == 'true'
         uses: actions/github-script@v7
         with:
           script: |
@@ -100,14 +144,18 @@ jobs:
             });
 
       - name: Set up Python
+        if: steps.authz.outputs.ok == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
 
-      - run: pip install jsonschema
+      - name: Install dependencies
+        if: steps.authz.outputs.ok == 'true'
+        run: pip install jsonschema
 
       - name: Verify ownership
         id: verify
+        if: steps.authz.outputs.ok == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
@@ -117,6 +165,7 @@ jobs:
             --plugin-list pluginList.json --output removal-verify.md
 
       - name: Comment verdict + label
+        if: steps.authz.outputs.ok == 'true'
         uses: actions/github-script@v7
         with:
           script: |
@@ -146,11 +195,25 @@ jobs:
             }
             if (want) await github.rest.issues.addLabels({owner, repo, issue_number, labels: [want]});
 
+      - name: /submit override
+        if: >-
+          steps.authz.outputs.ok == 'true' && steps.authz.outputs.command == 'submit' &&
+          steps.verify.outputs.verdict != 'verified'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const issue_number = context.issue.number;
+            await github.rest.issues.addLabels({owner, repo, issue_number, labels: ['needs-manual-review']});
+            await github.rest.issues.createComment({owner, repo, issue_number,
+              body: 'Flagged for manual review — the reporter used `/submit` to ask a maintainer to ' +
+                    'decide despite automated ownership verification not confirming this directly.'});
+
       # --- from here on: only for a verified removal ---------------------------
 
       - name: Remove plugin entry
         id: remove
-        if: steps.verify.outputs.verdict == 'verified'
+        if: steps.authz.outputs.ok == 'true' && steps.verify.outputs.verdict == 'verified'
         env:
           ISSUE_BODY: ${{ github.event.issue.body }}
         run: |
@@ -173,7 +236,7 @@ jobs:
       # since `error` can contain attacker-supplied issue-form text; substituting
       # it into the JS source via ${{ }} would be a script-injection vector.
       - name: Comment + close
-        if: steps.verify.outputs.verdict == 'verified'
+        if: steps.authz.outputs.ok == 'true' && steps.verify.outputs.verdict == 'verified'
         uses: actions/github-script@v7
         env:
           REMOVED: ${{ steps.remove.outputs.removed }}

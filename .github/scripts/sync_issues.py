@@ -95,7 +95,7 @@ def main():
     for r in plugins:
         name = r["name"]
         title = f"[FPP {target}] {name} — compatibility & compliance"
-        body = issue_body(r, target)
+        body = issue_body(r, target, draft=False)
         iss = existing.get(name)
 
         if args.mode == "reconcile":

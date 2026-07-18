@@ -37,6 +37,10 @@
 # rebuilt from master every run, and force-pushed — a later /recheck or /submit just
 # updates the same PR rather than piling up duplicates, and once master actually has the
 # entry (PR merged), add_plugin_entry.py reports ALREADY_LISTED and this becomes a no-op.
+#
+# AUTHZ: /recheck and /submit only take effect from the issue's original reporter —
+# see the "Restrict..." step below. Anyone else gets told to open their own submission
+# instead of being able to act on someone else's.
 
 name: Scan new plugin submission
 
@@ -64,16 +68,51 @@ jobs:
        contains(github.event.comment.body, '/submit'))
     runs-on: ubuntu-latest
     steps:
+      - name: Restrict /recheck and /submit to the original reporter
+        id: authz
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (context.eventName !== 'issue_comment') {
+              core.setOutput('ok', 'true');
+              core.setOutput('command', '');
+              return;
+            }
+            const commandUsed = context.payload.comment.body.includes('/submit') ? 'submit' : 'recheck';
+            core.setOutput('command', commandUsed);
+
+            const commenter = context.payload.comment.user.login;
+            const author = context.payload.issue.user.login;
+            if (commenter.toLowerCase() === author.toLowerCase()) {
+              core.setOutput('ok', 'true');
+              return;
+            }
+            core.setOutput('ok', 'false');
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.issue.number;
+            await github.rest.issues.createComment({
+              owner, repo, issue_number,
+              body: `⚠️ @${commenter} only the original reporter (**@${author}**) can use ` +
+                    `\`/${commandUsed}\` on this issue. If you'd like to submit your own plugin, ` +
+                    `please open a new request at ` +
+                    `https://darylc.github.io/fpp-data-ci/submit_new_plugin/.`,
+            });
+
       - uses: actions/checkout@v4
+        if: steps.authz.outputs.ok == 'true'
 
       - uses: actions/setup-python@v5
+        if: steps.authz.outputs.ok == 'true'
         with:
           python-version: "3.x"
 
-      - run: pip install jsonschema
+      - name: Install dependencies
+        if: steps.authz.outputs.ok == 'true'
+        run: pip install jsonschema
 
       - name: Extract pluginInfo URL + repoName from the issue body
         id: extract
+        if: steps.authz.outputs.ok == 'true'
         uses: actions/github-script@v7
         with:
           script: |
@@ -94,7 +133,7 @@ jobs:
             core.setOutput('category', category === '_No response_' ? '' : category);
 
       - name: Run compliance scan
-        if: steps.extract.outputs.plugininfo_url != ''
+        if: steps.authz.outputs.ok == 'true' && steps.extract.outputs.plugininfo_url != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # for the archived/issues-disabled/bugURL check
         run: |
@@ -106,7 +145,7 @@ jobs:
 
       - name: Comment results
         id: comment
-        if: steps.extract.outputs.plugininfo_url != ''
+        if: steps.authz.outputs.ok == 'true' && steps.extract.outputs.plugininfo_url != ''
         uses: actions/github-script@v7
         with:
           script: |
@@ -191,7 +230,7 @@ jobs:
 
       - name: Add pluginList.json entry on a branch
         id: edit
-        if: steps.comment.outputs.ready == 'true'
+        if: steps.authz.outputs.ok == 'true' && steps.comment.outputs.ready == 'true'
         run: |
           set -e
           git config user.name "github-actions[bot]"
@@ -222,7 +261,7 @@ jobs:
           fi
 
       - name: Open or update the listing PR
-        if: steps.comment.outputs.ready == 'true' && startsWith(steps.edit.outputs.status, 'ADDED')
+        if: steps.authz.outputs.ok == 'true' && steps.comment.outputs.ready == 'true' && startsWith(steps.edit.outputs.status, 'ADDED')
         uses: actions/github-script@v7
         with:
           script: |
@@ -284,7 +323,7 @@ jobs:
             await github.rest.issues.update({ owner, repo, issue_number, state: 'closed' });
 
       - name: Comment if already listed
-        if: steps.comment.outputs.ready == 'true' && startsWith(steps.edit.outputs.status, 'ALREADY_LISTED')
+        if: steps.authz.outputs.ok == 'true' && steps.comment.outputs.ready == 'true' && startsWith(steps.edit.outputs.status, 'ALREADY_LISTED')
         uses: actions/github-script@v7
         with:
           script: |
@@ -297,7 +336,7 @@ jobs:
             await github.rest.issues.update({ owner, repo, issue_number, state: 'closed' });
 
       - name: Comment if the category couldn't be matched
-        if: steps.comment.outputs.ready == 'true' && startsWith(steps.edit.outputs.status, 'UNKNOWN_CATEGORY')
+        if: steps.authz.outputs.ok == 'true' && steps.comment.outputs.ready == 'true' && startsWith(steps.edit.outputs.status, 'UNKNOWN_CATEGORY')
         uses: actions/github-script@v7
         with:
           script: |

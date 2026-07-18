@@ -1,0 +1,145 @@
+# On-demand recheck for a single campaign tracking issue, instead of only via the
+# bulk manual campaign run (plugin-compliance-scan.yml) or the daily reconcile sweep
+# (daily-fpp-compat.yml). Mirrors scan-new-submission.yml's pattern:
+#   /recheck — re-run this one plugin's scan fresh (e.g. after pushing a fix).
+#   /submit  — the owner disagrees with a finding; flag needs-manual-review for a
+#              maintainer to decide regardless of the automated verdict.
+#
+# AUTHZ: unlike a submission/removal issue (opened by the person who then acts on
+# it), a tracking issue is opened by the campaign itself — there's no "issue
+# creator" to restrict /recheck and /submit to. This resolves the PLUGIN'S
+# REGISTERED OWNER instead (from srcURL, via resolve_plugin_owner.py) and only
+# lets that GitHub login use either command here.
+#
+# Identifies a tracking issue by the hidden `<!-- plugin:<name> campaign:fpp<n> -->`
+# marker campaign_scan.issue_body() puts in its body — same body-shape approach used
+# throughout this repo's CI (see check-submission-token.yml) rather than a label,
+# since GitHub silently drops template labels that don't exist on the repo.
+
+name: Recheck campaign tracking issue
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+
+jobs:
+  recheck:
+    if: >-
+      contains(github.event.issue.body, '<!-- plugin:') &&
+      (contains(github.event.comment.body, '/recheck') || contains(github.event.comment.body, '/submit'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - run: pip install jsonschema
+
+      - name: Extract plugin name + target major from the issue body
+        id: extract
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.issue.body || '';
+            const m = body.match(/<!--\s*plugin:(\S+)\s+campaign:fpp(\d+)\s*-->/);
+            core.setOutput('name', m ? m[1] : '');
+            core.setOutput('target', m ? m[2] : '');
+            core.setOutput('command', context.payload.comment.body.includes('/submit') ? 'submit' : 'recheck');
+
+      - name: Resolve the plugin's registered owner
+        id: owner
+        if: steps.extract.outputs.name != ''
+        run: |
+          python .github/scripts/resolve_plugin_owner.py \
+            --plugin-list pluginList.json --repo-name "${{ steps.extract.outputs.name }}"
+
+      - name: Restrict /recheck and /submit to that owner
+        id: authz
+        if: steps.extract.outputs.name != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const commenter = context.payload.comment.user.login;
+            const owner = '${{ steps.owner.outputs.owner }}';
+            const command = '${{ steps.extract.outputs.command }}';
+
+            if (owner && commenter.toLowerCase() === owner.toLowerCase()) {
+              core.setOutput('ok', 'true');
+              return;
+            }
+            core.setOutput('ok', 'false');
+            const { owner: repoOwner, repo } = context.repo;
+            const issue_number = context.payload.issue.number;
+            await github.rest.issues.createComment({
+              owner: repoOwner, repo, issue_number,
+              body: `⚠️ @${commenter} only \`${{ steps.extract.outputs.name }}\`'s registered owner` +
+                    (owner ? ` (**@${owner}**)` : '') +
+                    ` can use \`/${command}\` on this tracking issue. If you believe this is wrong, ` +
+                    `please contact a maintainer.`,
+            });
+
+      - name: Recheck this plugin
+        id: recheck
+        if: steps.authz.outputs.ok == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python .github/scripts/campaign_recheck_one.py \
+            --plugin-list pluginList.json \
+            --repo-name "${{ steps.extract.outputs.name }}" \
+            --target-major "${{ steps.extract.outputs.target }}" \
+            --schema .github/schema/pluginInfo.schema.json \
+            --out recheck-result.json
+
+      - name: Update the tracking issue
+        if: steps.authz.outputs.ok == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const data = JSON.parse(fs.readFileSync('recheck-result.json', 'utf8'));
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.issue.number;
+            const target = '${{ steps.extract.outputs.target }}';
+            const command = '${{ steps.extract.outputs.command }}';
+
+            if (!data.found) {
+              await github.rest.issues.createComment({ owner, repo, issue_number,
+                body: `⚠️ \`${{ steps.extract.outputs.name }}\` is no longer in \`pluginList.json\` — nothing to recheck.` });
+              return;
+            }
+            const r = data.result;
+
+            // Body is the up-to-date dashboard-style report; keep it fresh so the
+            // issue itself always reflects the latest recheck, not just the comment.
+            await github.rest.issues.update({ owner, repo, issue_number, body: data.body });
+
+            // Swap the status:<...> label (added by sync_issues.py at creation time).
+            const issue = await github.rest.issues.get({ owner, repo, issue_number });
+            for (const l of issue.data.labels) {
+              if (typeof l === 'object' && l.name && l.name.startsWith('status:') && l.name !== `status:${r.status}`) {
+                try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch (e) {}
+              }
+            }
+            await github.rest.issues.addLabels({ owner, repo, issue_number, labels: [`status:${r.status}`] });
+
+            const summary = `B${r.num_blocker} best-practice ${r.num_best_practice} optional ${r.num_optional}`;
+            if (r.certified) {
+              await github.rest.issues.createComment({ owner, repo, issue_number,
+                body: `✅ Rechecked — now declares FPP ${target} compatibility. Closing.` });
+              await github.rest.issues.update({ owner, repo, issue_number, state: 'closed', state_reason: 'completed' });
+            } else if (command === 'submit') {
+              await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['needs-manual-review'] });
+              await github.rest.issues.createComment({ owner, repo, issue_number,
+                body: `Rechecked (${summary}) — still not FPP ${target} compatible, but the owner used ` +
+                      `\`/submit\` to ask a maintainer to look regardless. Flagged for manual review.` });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number,
+                body: `Rechecked (${summary}) — see the updated report above. Comment \`/recheck\` again ` +
+                      `after another push, or \`/submit\` if you believe a finding doesn't apply.` });
+            }

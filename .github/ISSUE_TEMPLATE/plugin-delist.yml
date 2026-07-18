@@ -24,7 +24,9 @@ body:
     id: repoName
     attributes:
       label: Plugin repoName
-      description: The `repoName` exactly as it appears in pluginList.json.
+      description: >
+        The `repoName` as it appears in pluginList.json — or just paste your
+        GitHub repo URL / pluginInfo.json URL, we'll figure out the repoName.
       placeholder: fpp-my-plugin
     validations:
       required: true

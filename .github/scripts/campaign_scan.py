@@ -193,6 +193,10 @@ def issue_body(r, target, draft=True):
         mention = "not @-mentioned in this dry run" if draft else "not @-mentioned — see MENTION_OWNER"
         L.append(f"Maintainer: `{r['owner']}` (https://github.com/{r['owner']}) *({mention})*")
     L.append("")
+    L.append(f"> ℹ️ FPP's plugin **submission** and **removal** process has been streamlined — see the "
+             f"[Plugin Guidelines]({GUIDELINES}) for what's expected of a listed plugin. Adding another "
+             f"plugin? Start at the [guided submission page]({SUBMISSION_GUIDED_PAGE}).")
+    L.append("")
     if r["status"] == "unmaintained":
         push = f"{r['months_since_push']} months" if r["months_since_push"] is not None else "a long time"
         L.append(f"> 💤 No activity in {push} — if you'd like to remove this plugin instead of "
@@ -204,7 +208,8 @@ def issue_body(r, target, draft=True):
         L.append(f"### ✅ Compatibility\nA `versions[]` entry already declares FPP {target} support.")
     else:
         L.append(f"### 🔧 Please declare FPP {target} compatibility")
-        L.append(f"Add a `versions[]` entry to your `pluginInfo.json` once tested on FPP {target}:")
+        L.append(f"**Please start testing `{r['name']}` on FPP {target}** if you haven't already, then add "
+                 f"a `versions[]` entry to your `pluginInfo.json` once it's confirmed working:")
         L.append("```json\n{\n"
                  f'    "minFPPVersion": "{target}.0",\n'
                  '    "maxFPPVersion": "0",\n'

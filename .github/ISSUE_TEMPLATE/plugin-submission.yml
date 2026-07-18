@@ -110,7 +110,7 @@ body:
   - type: textarea
     id: contact_token
     attributes:
-      label: Contact token (encrypted email)
+      label: Contact token
       description: >
         Filled in by the
         **[guided page](https://darylc.github.io/fpp-data-ci/submit_new_plugin/)** — leave it alone.

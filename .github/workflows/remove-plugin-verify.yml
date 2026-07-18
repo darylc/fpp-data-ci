@@ -19,11 +19,10 @@
 # step was silently dead code. Doing both in the same job sidesteps that
 # entirely — there's no second event to fail to fire.
 #
-# It also retitles the issue from the bare "[Remove plugin request]" (Issue
-# Forms can't template the title from a field value, so the form leaves it as
-# just that prefix rather than a confusing "<your-repoName>" placeholder) to
-# "[Remove plugin request] <repoName>" using what the submitter typed, so the
-# issue queue is scannable at a glance.
+# The issue title (including repoName) is set client-side by the guided page
+# (docs/submit_remove_plugin/) via the `title` prefill query param — same as
+# scan-new-submission.yml, no server-side rename-after-creation here. A manually
+# opened issue (not via the guided page) just keeps the form's static default title.
 #
 # RECHECKING: an "unconfirmed" or "error" verdict tells the submitter to fix
 # something (set delist:true, fix a typo'd repoName) -- but re-editing the
@@ -100,48 +99,6 @@ jobs:
       - name: Check out fpp-data
         if: steps.authz.outputs.ok == 'true'
         uses: actions/checkout@v4
-
-      # Runs before verification (and is skipped entirely once the title already
-      # matches) so a bad/unresolvable repoName still gets a readable issue title.
-      # Guard against self-triggering: this API call itself fires another `edited`
-      # event, but the no-op title comparison on that second run stops it there.
-      - name: Set issue title from repoName
-        if: steps.authz.outputs.ok == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const body = context.payload.issue.body || '';
-            let repoName = '';
-            const lines = body.split('\n');
-            for (let i = 0; i < lines.length; i++) {
-              if (lines[i].trim().toLowerCase() === '### plugin reponame') {
-                for (let j = i + 1; j < lines.length; j++) {
-                  const s = lines[j].trim();
-                  if (s && !s.startsWith('#')) { repoName = s; break; }
-                }
-                break;
-              }
-            }
-            if (!repoName || repoName === '_No response_') return;
-
-            // Submitters sometimes paste a GitHub URL instead of the bare repoName
-            // (a repo page, or a raw.githubusercontent.com pluginInfo.json link) --
-            // pull just the repo segment out, matching lib_plugin_schema.resolve_repo_name.
-            if (repoName.includes('github.com') || repoName.includes('githubusercontent.com')) {
-              try {
-                const u = new URL(repoName.includes('://') ? repoName : `https://${repoName}`);
-                const parts = u.pathname.split('/').filter(Boolean);
-                if (parts.length >= 2) repoName = parts[1].replace(/\.git$/, '');
-              } catch (e) { /* not a real URL -- use as typed */ }
-            }
-
-            const wantTitle = `[Remove plugin request] ${repoName}`;
-            if (context.payload.issue.title === wantTitle) return;
-
-            const {owner, repo} = context.repo;
-            await github.rest.issues.update({
-              owner, repo, issue_number: context.issue.number, title: wantTitle,
-            });
 
       - name: Set up Python
         if: steps.authz.outputs.ok == 'true'

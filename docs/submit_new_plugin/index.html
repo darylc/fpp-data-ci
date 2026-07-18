@@ -180,10 +180,12 @@ async function deriveFromRepo() {
   const raw = $("repo_url").value.trim();
   if (!raw) return null;
 
-  const m = raw.match(/^(?:https?:\/\/)?(?:www\.)?github\.com\/([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?\/?$/)
+  // Accepts github.com/owner/repo, raw.githubusercontent.com/owner/repo(/branch/pluginInfo.json...),
+  // or bare owner/repo — anything after the repo segment (branch, file path, .git) is ignored.
+  const m = raw.match(/^(?:https?:\/\/)?(?:www\.)?(?:github\.com|raw\.githubusercontent\.com)\/([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?(?:\/.*)?$/)
          || raw.match(/^([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?$/);
   if (!m) {
-    setMsg(fetchMsg, "Enter your repo as owner/repo or a full github.com URL.", "err");
+    setMsg(fetchMsg, "Enter your repo as owner/repo or a full github.com / raw.githubusercontent.com URL.", "err");
     return null;
   }
   const [, owner, repo] = m;

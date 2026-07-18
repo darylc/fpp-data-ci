@@ -87,11 +87,16 @@
     <div id="msg" class="msg"></div>
 
     <!-- Hidden, not asked here: category can't be carried over at all (GitHub Issue
-         Forms cannot prefill dropdown fields, full stop — see generate() below), and
-         display_name/repo_name/plugininfo_url/description are auto-read from your
-         repo's pluginInfo.json when possible. Whatever isn't known lands blank on the
-         next page and you fill it in there — that page's own inputs are the one place
-         all of this can reliably be reviewed and corrected. -->
+         Forms cannot prefill dropdown fields, full stop — see generate() below).
+         plugininfo_url/description are auto-read from your repo's pluginInfo.json
+         when possible and sent on to the issue as its own PUBLIC_FIELDS (below);
+         whatever isn't known lands blank there and you fill it in on GitHub directly.
+         display_name and repo_name are read from pluginInfo.json too, but ONLY used
+         locally here (issue title + the token payload's repo binding + a sanity
+         check that a repoName was found at all) — the issue form itself no longer
+         asks for either, since scan_submission.py derives both straight from
+         pluginInfo.json server-side and a submitter-typed copy would just be a
+         second, driftable source of truth for the same data. -->
     <input id="display_name" type="hidden">
     <input id="repo_name" type="hidden">
     <input id="plugininfo_url" type="hidden">
@@ -227,12 +232,13 @@ function b64(bytes) {
 const wrap = (s) => s.replace(/(.{72})/g, "$1\n").trim();
 
 // Fields that go straight onto the public issue, mapped to the form's field ids.
-// repo_url and email are the only two actually asked for on THIS page — repo_url is
-// itself one of PUBLIC_FIELDS (normalized to a full URL above so it links cleanly),
-// while the other three are best-effort auto-fill, sent along whether they came out
-// empty or not, and confirmed/corrected by the submitter on GitHub's own form instead
-// of here.
-const PUBLIC_FIELDS = ["repo_url", "display_name", "repo_name", "plugininfo_url", "description"];
+// repo_url, display_name, and repo_name are deliberately NOT here even though this
+// page reads/derives all three: the issue form no longer has matching fields for
+// them (scan_submission.py derives repoName and the github.com repo itself from
+// pluginInfo.json, server-side, rather than trusting a submitter-typed copy), so
+// sending them as query params would just be prefilling fields that don't exist.
+// They're still used locally below (title, token payload, sanity check).
+const PUBLIC_FIELDS = ["plugininfo_url", "description"];
 
 async function generate() {
   const msg = $("msg");
@@ -247,9 +253,12 @@ async function generate() {
   setMsg(msg, "Reading pluginInfo.json…", "");
   await deriveFromRepo();
 
-  const v = Object.fromEntries(PUBLIC_FIELDS.map(f => [f, $(f).value.trim()]));
-  if (!/^[A-Za-z0-9._-]+$/.test(v.repo_name))
+  const repoName = $("repo_name").value.trim();
+  const displayName = $("display_name").value.trim();
+  if (!/^[A-Za-z0-9._-]+$/.test(repoName))
     return setMsg(msg, "Couldn't work out a repoName from that repo — check the URL and try again.", "err");
+
+  const v = Object.fromEntries(PUBLIC_FIELDS.map(f => [f, $(f).value.trim()]));
 
   setMsg(msg, "Encrypting…", "");
   try {
@@ -258,7 +267,7 @@ async function generate() {
     );
     // repo is encrypted alongside the email so a token lifted from someone else's
     // public issue can't be replayed against a different plugin.
-    const payload = JSON.stringify({ v: 1, repo: v.repo_name, email, ts: new Date().toISOString() });
+    const payload = JSON.stringify({ v: 1, repo: repoName, email, ts: new Date().toISOString() });
     const ct = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, key,
                                            new TextEncoder().encode(payload));
     const token = PREFIX + "\n" + wrap(b64(ct));
@@ -268,7 +277,7 @@ async function generate() {
     // a special top-level param (not a field id) that overrides the template's default
     // "do not edit this title" placeholder with the actual plugin name.
     const qs = new URLSearchParams({
-      template: TEMPLATE, title: `[Plugin] ${v.display_name || v.repo_name}`, ...v, contact_token: token,
+      template: TEMPLATE, title: `[Plugin] ${displayName || repoName}`, ...v, contact_token: token,
     });
     const url = `https://github.com/${REPO}/issues/new?${qs}`;
 

@@ -13,46 +13,16 @@
 # the short names in pluginCategories.json (which stays the single source of truth).
 # A CI check (validate-pluginlist) asserts these two lists still match so they can't drift.
 
-name: "Workflow processor (do not use)"
+name: "Plugin submission form, access via https://darylc.github.io/fpp-data-ci/submit_new_plugin/"
 description: Do not open this directly — use the guided submission page instead (link at the bottom of the New Issue chooser).
 title: "[New Plugin Submission - do not edit this title]"
 labels: ["plugin", "submission"]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        ## 🛑 You should only arrive here via https://darylc.github.io/fpp-data-ci/submit_new_plugin/ which will pre-fill this form for you.
-
-  
-  - type: input
-    id: repo_url
-    attributes:
-      label: GitHub repo
-      description: The repo's own GitHub page (not the pluginInfo.json URL below).
-      placeholder: https://github.com/you/fpp-AnnouncementAssistant
-    validations:
-      required: true
-
-  - type: input
-    id: display_name
-    attributes:
-      label: Plugin display name
-      description: The human-friendly name shown in the Plugin Manager (e.g. "Announcement Assistant").
-      placeholder: Announcement Assistant
-    validations:
-      required: true
-
-  - type: input
-    id: repo_name
-    attributes:
-      label: repoName
-      description: >
-        The exact `repoName` from your `pluginInfo.json`. It must match your GitHub repo
-        name and is used as the entry's key in the list.
-      placeholder: fpp-AnnouncementAssistant
-    validations:
-      required: true
-
+  # No "GitHub repo" or "repoName" fields: both are fully derivable from
+  # pluginInfo.json below (repoName is a field in the JSON itself; the repo is
+  # parsed from either pluginInfo.json's srcURL or this raw.githubusercontent.com
+  # URL) — see scan_submission.py. Asking the submitter to retype them just
+  # creates a second copy that can drift from the JSON and has to be reconciled.
   - type: input
     id: plugininfo_url
     attributes:
@@ -120,9 +90,7 @@ body:
         it, so a plain address would be exposed immediately and cannot be un-published. The
         token is your email encrypted in your browser — only FPP maintainers can read it.
       placeholder: |
-        FPPC1:
-        JbKch9EvKbnr1VmMrJS3hqrxP3Q+RD22azOvS3uUIbR8Wl0wWXL8YdKgZ3H4VJM69Z5yx8kc
-        ...
+        Empty? You arrived here directly. See the link above — go to the guided page first.
       render: text
     validations:
       required: true

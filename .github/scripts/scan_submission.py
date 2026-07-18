@@ -10,8 +10,14 @@ grandfathering: here, BEST_PRACTICE findings block same as BLOCKER, not just adv
 OPTIONAL stays advisory in both cases (LICENSE/README/icon/bugURL are nice-to-have,
 not a gate).
 
+repoName and the github.com repo are never taken from the submitter — both are derived
+here from pluginInfo.json itself (repoName is a field in the JSON; the repo comes from
+its srcURL, falling back to the raw.githubusercontent.com pluginInfo-url). There is
+nothing left for a submitter-supplied copy to mismatch against, so unlike the campaign
+scanner there is no repo-name-mismatch check here.
+
 Usage:
-  scan_submission.py --plugininfo-url <raw pluginInfo.json URL> --repo-name <repoName> \
+  scan_submission.py --plugininfo-url <raw pluginInfo.json URL> \
       --schema .github/schema/pluginInfo.schema.json --out result.json
 """
 
@@ -31,7 +37,6 @@ from lib_plugin_schema import (  # noqa: E402
     parse_github_repo,
     parse_raw_github_repo,
     repo_metadata_findings,
-    repo_name_mismatch,
     schema_validation_error,
 )
 from lint_plugin import lint_plugin_dir, BLOCKER, BEST_PRACTICE, OPTIONAL  # noqa: E402
@@ -57,7 +62,6 @@ def clone_repo(owner: str, repo: str, dest: str) -> str | None:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--plugininfo-url", required=True)
-    ap.add_argument("--repo-name", default=None)
     ap.add_argument("--schema", required=True)
     ap.add_argument("--reporter", default=None, help="GitHub login of the issue's original reporter")
     ap.add_argument("--issue-number", default=None)
@@ -78,10 +82,6 @@ def main():
         schema_err = schema_validation_error(info, schema)
         if schema_err:
             findings.append((BLOCKER, "schema", schema_err))
-
-        mismatch = repo_name_mismatch(info, args.repo_name)
-        if mismatch:
-            findings.append((BLOCKER, "repo-name-mismatch", mismatch))
 
     # --- repo metadata (archived / issues-disabled / bugURL) --------------------
     gh = parse_github_repo(info.get("srcURL", "") or "") if info else None
@@ -112,6 +112,12 @@ def main():
                 f"the owner's behalf with their consent, comment `/submit` instead to flag this for a "
                 f"maintainer's judgement rather than auto-verifying."))
 
+    # repoName always comes from pluginInfo.json itself, falling back to the github.com
+    # repo slug (from srcURL/plugininfo-url) only if the JSON omits it — schema
+    # validation above already blocks a submission with no repoName at all, so this
+    # fallback just keeps clone/lint working in that already-failing case too.
+    repo_name = (info or {}).get("repoName") or (gh[1] if gh else None)
+
     # --- clone + static lint --------------------------------------------------
     linted = False
     if gh:
@@ -123,7 +129,7 @@ def main():
                 findings.append((BLOCKER, "clone-failed", clone_err))
             else:
                 linted = True
-                for f in lint_plugin_dir(dest, args.repo_name or repo, info=info):
+                for f in lint_plugin_dir(dest, repo_name or repo, info=info):
                     findings.append((f.severity, f.code, f.message))
     else:
         findings.append((BLOCKER, "no-repo-url",
@@ -139,6 +145,8 @@ def main():
         "linted": linted,
         "owner": gh[0] if gh else None,   # registered owner from srcURL — may differ from the submitter
         "owner_confirmed": owner_confirmed,
+        "repo_name": repo_name,
+        "repo_url": f"https://github.com/{gh[0]}/{gh[1]}" if gh else None,
         "findings": [{"severity": s, "code": c, "message": m} for s, c, m in findings],
         "num_blocking": len(blocking),
         "num_advisory": len(advisory),

@@ -27,7 +27,7 @@
 #
 # LISTING PR: the moment a submission is ready (pass or /submit), this also opens a PR
 # adding it to pluginList.json — add_plugin_entry.py. No further validation runs against
-# that PR by design: schema, repoName match, and archived/issues-disabled all already
+# that PR by design: schema and archived/issues-disabled all already
 # ran in scan_submission.py above to decide "ready", and category validity is checked by
 # add_plugin_entry.py itself before it'll insert anything. validate-pluginlist.yml would
 # only add value if a maintainer hand-edits the entry before merging — and a human push
@@ -110,7 +110,7 @@ jobs:
         if: steps.authz.outputs.ok == 'true'
         run: pip install jsonschema
 
-      - name: Extract pluginInfo URL + repoName from the issue body
+      - name: Extract pluginInfo URL + category from the issue body
         id: extract
         if: steps.authz.outputs.ok == 'true'
         uses: actions/github-script@v7
@@ -126,13 +126,9 @@ jobs:
               return '';
             }
             const infoUrl = field('pluginInfo.json raw URL');
-            const repoName = field('repoName');
             const category = field('Category');
-            const repoUrl = field('GitHub repo');
             core.setOutput('plugininfo_url', infoUrl === '_No response_' ? '' : infoUrl);
-            core.setOutput('repo_name', repoName === '_No response_' ? '' : repoName);
             core.setOutput('category', category === '_No response_' ? '' : category);
-            core.setOutput('repo_url', repoUrl === '_No response_' ? '' : repoUrl);
 
       - name: Run compliance scan
         if: steps.authz.outputs.ok == 'true' && steps.extract.outputs.plugininfo_url != ''
@@ -141,7 +137,6 @@ jobs:
         run: |
           python .github/scripts/scan_submission.py \
             --plugininfo-url "${{ steps.extract.outputs.plugininfo_url }}" \
-            --repo-name "${{ steps.extract.outputs.repo_name }}" \
             --schema .github/schema/pluginInfo.schema.json \
             --reporter "${{ github.event.issue.user.login }}" \
             --issue-number "${{ github.event.issue.number }}" \
@@ -231,6 +226,10 @@ jobs:
               }
             }
             core.setOutput('ready', String(ready));
+            // repoName/repoUrl are never taken from the issue body — both come from
+            // scan_submission.py, which derived them straight from pluginInfo.json.
+            core.setOutput('repo_name', result.repo_name || '');
+            core.setOutput('repo_url', result.repo_url || '');
 
       - name: Add pluginList.json entry on a branch
         id: edit
@@ -239,13 +238,13 @@ jobs:
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          BRANCH="add-plugin/${{ steps.extract.outputs.repo_name }}"
+          BRANCH="add-plugin/${{ steps.comment.outputs.repo_name }}"
           git checkout -B "$BRANCH"
 
           OUT=$(python .github/scripts/add_plugin_entry.py \
             --plugin-list pluginList.json \
             --categories pluginCategories.json \
-            --repo-name "${{ steps.extract.outputs.repo_name }}" \
+            --repo-name "${{ steps.comment.outputs.repo_name }}" \
             --plugininfo-url "${{ steps.extract.outputs.plugininfo_url }}" \
             --category "${{ steps.extract.outputs.category }}") || true
           echo "$OUT"
@@ -258,7 +257,7 @@ jobs:
 
           if [[ "$OUT" == ADDED* ]]; then
             git add pluginList.json
-            git commit -m "Add ${{ steps.extract.outputs.repo_name }} to pluginList.json
+            git commit -m "Add ${{ steps.comment.outputs.repo_name }} to pluginList.json
 
           Requested in #${{ github.event.issue.number }}."
             git push -f origin "$BRANCH"
@@ -273,7 +272,7 @@ jobs:
             const { owner, repo } = context.repo;
             const issue_number = context.payload.issue.number;
             const branch = '${{ steps.edit.outputs.branch }}';
-            const repoName = '${{ steps.extract.outputs.repo_name }}';
+            const repoName = '${{ steps.comment.outputs.repo_name }}';
 
             const result = JSON.parse(fs.readFileSync('scan-result.json', 'utf8'));
             const badge = { blocker: '🛑', 'best-practice': '⚠️', optional: '💡' };
@@ -284,7 +283,7 @@ jobs:
               .sort((a, b) => (order[a.severity] ?? 3) - (order[b.severity] ?? 3));
 
             const reporter = context.payload.issue.user.login;
-            const repoUrl = '${{ steps.extract.outputs.repo_url }}';
+            const repoUrl = '${{ steps.comment.outputs.repo_url }}';
             const registeredOwner = result.owner;
 
             const lines = [`Adds \`${repoName}\` to \`pluginList.json\`, requested in #${issue_number}.`, ''];
@@ -315,7 +314,7 @@ jobs:
               lines.push('');
             }
             lines.push(
-              'Schema, repoName match, category, and archived/issues-disabled were already checked before ' +
+              'Schema, category, and archived/issues-disabled were already checked before ' +
               'this PR existed — `validate-pluginlist.yml` will only run here if a maintainer pushes a ' +
               'hand-edit to this branch before merging.', '',
               '**Merging is entirely up to a maintainer\'s judgement** — this PR being open is not an approval, ' +
@@ -354,7 +353,7 @@ jobs:
             const issue_number = context.payload.issue.number;
             await github.rest.issues.createComment({
               owner, repo, issue_number,
-              body: `\`${{ steps.extract.outputs.repo_name }}\` is already in \`pluginList.json\` — nothing to do here. Closing.`,
+              body: `\`${{ steps.comment.outputs.repo_name }}\` is already in \`pluginList.json\` — nothing to do here. Closing.`,
             });
             await github.rest.issues.update({ owner, repo, issue_number, state: 'closed' });
 

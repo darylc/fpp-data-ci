@@ -136,13 +136,6 @@ def schema_validation_error(info: dict, schema: dict) -> Optional[str]:
         return f"pluginInfo.json fails schema at `{loc}`: {e.message}"
 
 
-def repo_name_mismatch(info: dict, expected_name: Optional[str]) -> Optional[str]:
-    """Message if pluginInfo.json's repoName doesn't match the expected one, else None."""
-    if expected_name and info.get("repoName") and info["repoName"] != expected_name:
-        return f"pluginInfo.json repoName '{info['repoName']}' does not match '{expected_name}'"
-    return None
-
-
 def repo_metadata_findings(meta: dict, bug_url: str) -> list[tuple[str, str, str]]:
     """archived / issues-disabled / bugURL findings from a GitHub API repo response.
 

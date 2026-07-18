@@ -7,8 +7,12 @@ pluginCategories.json is the single source of truth, but two places can't read i
 must keep a copy:
 
   1. .github/ISSUE_TEMPLATE/plugin-submission.yml — GitHub Issue Forms are static YAML
-     and cannot fetch anything. Its dropdown is a hand-kept copy. This is the real risk:
-     add a category upstream and the form silently offers a stale list forever.
+     and cannot fetch anything, and a dropdown's options are plain strings with no
+     separate label/value — so it shows longName (there's no way to display the long
+     name but submit the short one, unlike the JS-driven guided page below). Whoever
+     files an accepted submission into pluginList.json must look up the matching short
+     `name` in pluginCategories.json by longName. This is a hand-kept copy: add a
+     category upstream and the form silently offers a stale list forever.
 
   2. docs/contact/index.html — CATEGORIES_FALLBACK. The page fetches the real list at
      runtime, so this only shows if the fetch fails (offline/rate-limited). Lower stakes,
@@ -36,6 +40,17 @@ def load_source_of_truth(path):
     if not names:
         sys.exit(f"FATAL: no categories found in {path}")
     return names
+
+
+def load_source_of_truth_long(path):
+    """Long names — what the Issue Form dropdown now shows (short name isn't
+    representable in a static Issue Forms dropdown, see plugin-submission.yml)."""
+    data = json.load(open(path))
+    arr = data if isinstance(data, list) else (data.get("categories") or data.get("pluginCategories") or [])
+    long_names = [c["longName"] if isinstance(c, dict) else c for c in arr]
+    if not long_names:
+        sys.exit(f"FATAL: no categories found in {path}")
+    return long_names
 
 
 def load_form_dropdown(path):
@@ -79,12 +94,16 @@ def main():
     args = ap.parse_args()
 
     truth = load_source_of_truth(args.categories)
+    truth_long = load_source_of_truth_long(args.categories)
     print(f"pluginCategories.json (source of truth): {len(truth)} categories")
     print(f"  {', '.join(truth)}\n")
 
     errors = []
     if args.form:
-        report("Issue Form dropdown", truth, load_form_dropdown(args.form), errors)
+        # The Issue Form dropdown shows long names (static YAML dropdowns can't
+        # separate a display label from a submitted value), so compare against
+        # longName, not name.
+        report("Issue Form dropdown", truth_long, load_form_dropdown(args.form), errors)
     if args.page:
         report("Guided page fallback", truth, load_page_fallback(args.page), errors)
 

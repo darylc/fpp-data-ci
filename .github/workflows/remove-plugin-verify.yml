@@ -1,28 +1,28 @@
-# Verify + apply a de-list request in one workflow.
+# Verify + apply a plugin-removal request in one workflow.
 #
-# When a `delist-request` issue is opened/edited, GitHub has already authenticated
+# When a `removal-request` issue is opened/edited, GitHub has already authenticated
 # the submitter, so we know their real login. This checks it against the plugin's
 # repo owner (from srcURL) and posts a sticky comment + a verdict label:
 #   owner-verified        submitter owns the repo (or it's archived/gone)
 #   ownership-unconfirmed  org repo / not the owner → asks for proof (delist:true)
-#   delist-error           couldn't resolve the plugin
+#   removal-error          couldn't resolve the plugin
 #
 # On `owner-verified` it goes straight on to remove the entry from
 # pluginList.json, commit it, and close the issue — no PR/review gate, since
 # ownership is already established by that point.
 #
 # WHY ONE WORKFLOW, NOT TWO: this used to be two workflows, with a second
-# "Apply verified de-list" triggered by the `owner-verified` label being added.
+# "Apply verified removal" triggered by the `owner-verified` label being added.
 # That never actually ran: the label was added here using the default
 # GITHUB_TOKEN, and GitHub deliberately does not let GITHUB_TOKEN-authored
 # events trigger further workflow runs (anti-recursion protection). The apply
 # step was silently dead code. Doing both in the same job sidesteps that
 # entirely — there's no second event to fail to fire.
 #
-# It also retitles the issue from the bare "[De-list plugin request]" (Issue
+# It also retitles the issue from the bare "[Remove plugin request]" (Issue
 # Forms can't template the title from a field value, so the form leaves it as
 # just that prefix rather than a confusing "<your-repoName>" placeholder) to
-# "[De-list plugin request] <repoName>" using what the submitter typed, so the
+# "[Remove plugin request] <repoName>" using what the submitter typed, so the
 # issue queue is scannable at a glance.
 #
 # RECHECKING: an "unconfirmed" or "error" verdict tells the submitter to fix
@@ -33,7 +33,7 @@
 # issue body -- e.g. useful after pushing delist:true, which this job can't
 # see until it re-fetches pluginInfo.json.
 
-name: Verify de-list ownership
+name: Verify plugin removal ownership
 
 on:
   issues:
@@ -47,11 +47,11 @@ permissions:
 
 jobs:
   verify:
-    # Only for de-list requests (the form applies this label), and for a comment
-    # trigger, only when it's actually the /recheck command -- otherwise every
-    # comment on a delist-request issue would re-run this.
+    # Only for plugin-removal requests (the form applies this label), and for a
+    # comment trigger, only when it's actually the /recheck command -- otherwise
+    # every comment on a removal-request issue would re-run this.
     if: >-
-      contains(github.event.issue.labels.*.name, 'delist-request') &&
+      contains(github.event.issue.labels.*.name, 'removal-request') &&
       (github.event_name != 'issue_comment' || contains(github.event.comment.body, '/recheck'))
     runs-on: ubuntu-latest
     steps:
@@ -91,7 +91,7 @@ jobs:
               } catch (e) { /* not a real URL -- use as typed */ }
             }
 
-            const wantTitle = `[De-list plugin request] ${repoName}`;
+            const wantTitle = `[Remove plugin request] ${repoName}`;
             if (context.payload.issue.title === wantTitle) return;
 
             const {owner, repo} = context.repo;
@@ -113,16 +113,16 @@ jobs:
           ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
           ISSUE_BODY: ${{ github.event.issue.body }}
         run: |
-          python .github/scripts/verify_delist.py \
-            --plugin-list pluginList.json --output delist-verify.md
+          python .github/scripts/verify_remove_plugin.py \
+            --plugin-list pluginList.json --output removal-verify.md
 
       - name: Comment verdict + label
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const marker = '<!-- delist-ownership-check -->';
-            const body = marker + '\n' + fs.readFileSync('delist-verify.md', 'utf8');
+            const marker = '<!-- removal-ownership-check -->';
+            const body = marker + '\n' + fs.readFileSync('removal-verify.md', 'utf8');
             const {owner, repo} = context.repo;
             const issue_number = context.issue.number;
 
@@ -137,7 +137,7 @@ jobs:
 
             // verdict label (swap the three, keep whatever else is there)
             const verdict = '${{ steps.verify.outputs.verdict }}';
-            const map = {verified: 'owner-verified', unconfirmed: 'ownership-unconfirmed', error: 'delist-error', report: 'delist-report'};
+            const map = {verified: 'owner-verified', unconfirmed: 'ownership-unconfirmed', error: 'removal-error', report: 'removal-report'};
             const want = map[verdict];
             for (const l of Object.values(map)) {
               if (l !== want) {
@@ -146,7 +146,7 @@ jobs:
             }
             if (want) await github.rest.issues.addLabels({owner, repo, issue_number, labels: [want]});
 
-      # --- from here on: only for a verified de-list ---------------------------
+      # --- from here on: only for a verified removal ---------------------------
 
       - name: Remove plugin entry
         id: remove
@@ -154,7 +154,7 @@ jobs:
         env:
           ISSUE_BODY: ${{ github.event.issue.body }}
         run: |
-          python .github/scripts/remove_delisted_plugin.py \
+          python .github/scripts/remove_plugin_entry.py \
             --plugin-list pluginList.json --repo-name "${{ steps.verify.outputs.repo_name }}"
 
       - name: Commit and push
@@ -166,7 +166,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add pluginList.json
-          git commit -m "Delist $REMOVED (verified request #$ISSUE_NUMBER)"
+          git commit -m "Remove $REMOVED (verified request #$ISSUE_NUMBER)"
           git push
 
       # Both outputs are passed via env (not interpolated into the script body)
@@ -188,9 +188,9 @@ jobs:
             if (removed) {
               await github.rest.issues.createComment({owner, repo, issue_number,
                 body: `✅ Removed \`${removed}\` from \`pluginList.json\` (commit ${context.sha}).`});
-              await github.rest.issues.addLabels({owner, repo, issue_number, labels: ['delisted']});
+              await github.rest.issues.addLabels({owner, repo, issue_number, labels: ['removed']});
               await github.rest.issues.update({owner, repo, issue_number, state: 'closed'});
             } else if (error) {
               await github.rest.issues.createComment({owner, repo, issue_number,
-                body: `⚠️ Could not apply this de-list request automatically: ${error}\n\nA maintainer will need to handle this manually.`});
+                body: `⚠️ Could not apply this removal request automatically: ${error}\n\nA maintainer will need to handle this manually.`});
             }

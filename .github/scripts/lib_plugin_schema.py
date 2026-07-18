@@ -20,11 +20,12 @@ USER_AGENT = "fpp-data-plugin-ci"
 HTTP_TIMEOUT = 15  # seconds — generous for CI, still bounded
 
 # The rest of this campaign's CI NEVER @-mentions an author (see sync_issues.py,
-# campaign_scan.py) -- bulk scans pinging authors would be spam. The de-list-report
-# flow is a deliberate, narrow exception: notifying an owner that THEIR OWN plugin
-# was reported as abandoned is closer to "you should know about this" than a bulk
-# scan is. Held off for now (plain text, no real notification) until release;
-# flip this one flag then -- every caller goes through owner_ref() below.
+# campaign_scan.py) -- bulk scans pinging authors would be spam. The removal-report
+# flow (Request Plugin Removal, third-party path) is a deliberate, narrow exception:
+# notifying an owner that THEIR OWN plugin was reported as abandoned is closer to
+# "you should know about this" than a bulk scan is. Held off for now (plain text, no
+# real notification) until release; flip this one flag then -- every caller goes
+# through owner_ref() below.
 MENTION_OWNER = False
 
 
@@ -57,7 +58,7 @@ def fetch_json(url: str) -> tuple[Optional[Any], Optional[str]]:
 def resolve_repo_name(value: str) -> str:
     """Accept a bare repoName OR a GitHub URL and return just the repo name.
 
-    Submitters of the de-list Issue Form often paste a URL into the "Plugin
+    Submitters of the Request Plugin Removal Issue Form often paste a URL into the "Plugin
     repoName" field instead of the bare name FPP actually stores in
     pluginList.json — a repo page (`github.com/<owner>/<repo>`, with or without
     `.git`, `/issues`, `/blob/<branch>/pluginInfo.json`, ...) or a raw file URL

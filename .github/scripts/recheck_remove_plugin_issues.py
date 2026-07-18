@@ -1,12 +1,12 @@
-"""Hourly sweep: re-check open de-list requests that need time to resolve.
+"""Hourly sweep: re-check open plugin-removal requests that need time to resolve.
 
-Covers two kinds of open, unresolved `delist-request` issues (see
-verify_delist.py for how each gets its initial label):
+Covers two kinds of open, unresolved `removal-request` issues (see
+verify_remove_plugin.py for how each gets its initial label):
 
-  OWNER path (`ownership-unconfirmed` or `delist-error`) -- re-checked every
+  OWNER path (`ownership-unconfirmed` or `removal-error`) -- re-checked every
   run; auto-closed after OWNER_STALE_HOURS with no resolution.
 
-  THIRD-PARTY report path (`delist-report`) -- someone who isn't the plugin's
+  THIRD-PARTY report path (`removal-report`) -- someone who isn't the plugin's
   owner flagged it as abandoned. Re-checked every run for `"delist": true`
   (or the repo going archived/gone), which auto-applies immediately -- that's
   legitimate proof-of-control regardless of who reported it. Otherwise waits
@@ -18,16 +18,16 @@ verify_delist.py for how each gets its initial label):
   unlike the owner path, nobody here can unilaterally decide to drop a report
   someone else raised.
 
-WHY THIS EXISTS: the interactive workflow (delist-verify.yml) only re-checks
-on an issue edit or a `/recheck` comment -- both require the submitter to come
-back to THIS repo and do something. But the actual fix for "unconfirmed" is
-pushing `"delist": true` to THEIR OWN plugin repo, which has no webhook
-connection here at all. Most submitters will just push that and consider
-themselves done. This sweep is what actually catches that, with zero action
-required from them: it re-fetches each plugin's pluginInfo.json fresh every
-run, so a newly-pushed delist:true is picked up on the next hourly pass.
+WHY THIS EXISTS: the interactive workflow (remove-plugin-verify.yml) only
+re-checks on an issue edit or a `/recheck` comment -- both require the
+submitter to come back to THIS repo and do something. But the actual fix for
+"unconfirmed" is pushing `"delist": true` to THEIR OWN plugin repo, which has
+no webhook connection here at all. Most submitters will just push that and
+consider themselves done. This sweep is what actually catches that, with zero
+action required from them: it re-fetches each plugin's pluginInfo.json fresh
+every run, so a newly-pushed delist:true is picked up on the next hourly pass.
 
-Usage: recheck_delist_issues.py --plugin-list pluginList.json
+Usage: recheck_remove_plugin_issues.py --plugin-list pluginList.json
 Reads GITHUB_REPOSITORY and GITHUB_TOKEN from the environment.
 """
 
@@ -44,14 +44,14 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import lib_plugin_schema as lib  # noqa: E402
-from remove_delisted_plugin import remove_entry  # noqa: E402
-from verify_delist import field, resolve_owner  # noqa: E402
+from remove_plugin_entry import remove_entry  # noqa: E402
+from verify_remove_plugin import field, resolve_owner  # noqa: E402
 
 API = "https://api.github.com"
 UA = "fpp-data-plugin-ci"
 OWNER_STALE_HOURS = 24
 REPORT_STALE_HOURS = 24 * 7
-MARKER = "<!-- delist-ownership-check -->"
+MARKER = "<!-- removal-ownership-check -->"
 
 
 def _req(method, url, token, body=None):
@@ -67,17 +67,17 @@ def _req(method, url, token, body=None):
     return json.loads(raw) if raw else {}
 
 
-TARGET_LABELS = ("ownership-unconfirmed", "delist-error", "delist-report")
+TARGET_LABELS = ("ownership-unconfirmed", "removal-error", "removal-report")
 
 
 def list_candidates(repo: str, token: str) -> list[dict]:
-    """Open delist-request issues carrying any of TARGET_LABELS."""
+    """Open removal-request issues carrying any of TARGET_LABELS."""
     seen: dict[int, dict] = {}
     for extra_label in TARGET_LABELS:
         page = 1
         while True:
             url = (f"{API}/repos/{repo}/issues?state=open"
-                   f"&labels=delist-request,{extra_label}&per_page=100&page={page}")
+                   f"&labels=removal-request,{extra_label}&per_page=100&page={page}")
             batch = _req("GET", url, token)
             if not batch:
                 break
@@ -115,8 +115,8 @@ def swap_label(repo: str, token: str, number: int, want: str, all_verdict_labels
         _req("POST", f"{API}/repos/{repo}/issues/{number}/labels", token, {"labels": [want]})
 
 
-VERDICT_LABELS = ("owner-verified", "ownership-unconfirmed", "delist-error",
-                   "delist-report", "needs-manual-review", "delisted")
+VERDICT_LABELS = ("owner-verified", "ownership-unconfirmed", "removal-error",
+                   "removal-report", "needs-manual-review", "removed")
 
 
 def apply_removal(plugin_list: str, repo_name: str, number: int, repo: str, token: str) -> tuple[str | None, str | None]:
@@ -134,7 +134,7 @@ def apply_removal(plugin_list: str, repo_name: str, number: int, repo: str, toke
                      "github-actions[bot]@users.noreply.github.com"], check=True)
     subprocess.run(["git", "add", plugin_list], check=True)
     subprocess.run(["git", "commit", "-m",
-                     f"Delist {repo_name} (verified request #{number}, hourly recheck)"], check=True)
+                     f"Remove {repo_name} (verified request #{number}, hourly recheck)"], check=True)
     subprocess.run(["git", "push"], check=True)
 
     sha = subprocess.run(["git", "rev-parse", "HEAD"], check=True,
@@ -142,7 +142,7 @@ def apply_removal(plugin_list: str, repo_name: str, number: int, repo: str, toke
     _req("POST", f"{API}/repos/{repo}/issues/{number}/comments", token,
          {"body": f"✅ `\"delist\": true` detected on our hourly recheck — removed `{repo_name}` "
                   f"from `pluginList.json` (commit {sha})."})
-    swap_label(repo, token, number, "delisted", VERDICT_LABELS)
+    swap_label(repo, token, number, "removed", VERDICT_LABELS)
     _req("PATCH", f"{API}/repos/{repo}/issues/{number}", token, {"state": "closed"})
     return repo_name, None
 
@@ -155,14 +155,14 @@ def close_stale_owner_path(repo: str, token: str, issue: dict, repo_name: str, e
     if err:
         body = (f"⏱️ It's been {OWNER_STALE_HOURS}+ hours and we still couldn't resolve `{repo_name}` "
                 f"({err}) — closing this request. If removal is still needed, please open a new "
-                f"de-list request with the correct repoName.")
+                f"plugin removal request with the correct repoName.")
     else:
         body = (f"⏱️ It's been {OWNER_STALE_HOURS}+ hours and we still don't see `\"delist\": true` in "
                 f"`{repo_name}`'s `pluginInfo.json` — closing this request. If removal is still "
-                f"needed, please open a new de-list request once that's pushed (or ask a maintainer "
+                f"needed, please open a new removal request once that's pushed (or ask a maintainer "
                 f"for help if you can't prove ownership another way).")
     sticky_comment(repo, token, number, body)
-    swap_label(repo, token, number, "", VERDICT_LABELS)  # clear the verdict label, keep delist-request
+    swap_label(repo, token, number, "", VERDICT_LABELS)  # clear the verdict label, keep removal-request
     _req("PATCH", f"{API}/repos/{repo}/issues/{number}", token, {"state": "closed"})
 
 
@@ -189,7 +189,7 @@ def flag_manual_review(repo: str, token: str, number: int, repo_name: str, owner
                 f"decision.")
     sticky_comment(repo, token, number, body)
     _req("POST", f"{API}/repos/{repo}/issues/{number}/labels", token,
-         {"labels": ["needs-manual-review"]})  # additive: keep delist-report, don't swap it out
+         {"labels": ["needs-manual-review"]})  # additive: keep removal-report, don't swap it out
 
 
 def main():
@@ -204,14 +204,14 @@ def main():
 
     candidates = list_candidates(repo, token)
     if not candidates:
-        print("No open de-list issues need rechecking -- nothing to do.")
+        print("No open removal issues need rechecking -- nothing to do.")
         return
 
     print(f"Rechecking {len(candidates)} issue(s)...")
     for issue in candidates:
         number = issue["number"]
         labels = {l["name"] for l in issue.get("labels", [])}
-        is_report = "delist-report" in labels
+        is_report = "removal-report" in labels
 
         # Already flagged for a human -- terminal state for this sweep, don't
         # re-process every hour/re-comment on it.

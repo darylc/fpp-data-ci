@@ -1,6 +1,6 @@
-"""Remove a verified de-list request's entry from pluginList.json.
+"""Remove a verified plugin-removal request's entry from pluginList.json.
 
-Runs after delist-verify.py has already labeled the issue `owner-verified`
+Runs after remove-plugin-verify.yml has already labeled the issue `owner-verified`
 (personal-repo owner match, an archived/gone repo, or delist:true proof-of-control).
 Edits pluginList.json with a minimal line-level diff instead of round-tripping
 through json.dump, since the file is hand-formatted (one entry per line, custom
@@ -42,7 +42,7 @@ def remove_entry(text: str, repo_name: str) -> tuple[str | None, str | None]:
     if not entry_idx:
         return None, "no plugin entries found in pluginList.json"
 
-    # Case-insensitive: see resolve_owner()'s docstring in verify_delist.py --
+    # Case-insensitive: see resolve_owner()'s docstring in verify_remove_plugin.py --
     # a plugin's declared repoName doesn't always match its repo's URL casing.
     target = None
     for i in entry_idx:

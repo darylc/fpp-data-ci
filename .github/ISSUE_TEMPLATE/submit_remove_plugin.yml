@@ -1,16 +1,16 @@
-# GitHub Issue Form — "Retire / de-list a plugin".
+# GitHub Issue Form — "Request Plugin Removal".
 #
 # WHAT THIS IS: the opt-out counterpart to plugin-submission. An author who no longer
 # wants to maintain their plugin (e.g. rather than update it for a new FPP major) fills
 # this in to request removal from pluginList.json. A maintainer then merges the removal
 # (moving it to oldplugins/ where appropriate).
 #
-# WHERE IT LIVES: FalconChristmas/fpp-data/.github/ISSUE_TEMPLATE/plugin-delist.yml
+# WHERE IT LIVES: FalconChristmas/fpp-data/.github/ISSUE_TEMPLATE/submit_remove_plugin.yml
 
-name: Retire / de-list a plugin
+name: Request Plugin Removal
 description: Request that your plugin be removed from FPP's Plugin Manager list.
-title: "[De-list plugin request]"
-labels: ["plugin", "delist-request"]
+title: "[Remove plugin request]"
+labels: ["plugin", "removal-request"]
 body:
   - type: markdown
     attributes:
@@ -26,7 +26,7 @@ body:
       label: Are you the plugin's author/maintainer?
       description: >
         Determines what happens next. Owners get auto-verified and, once
-        confirmed, the plugin is de-listed automatically. A third-party report
+        confirmed, the plugin is removed automatically. A third-party report
         is never auto-applied — it just flags the plugin for a maintainer to
         look into, and you won't be asked to prove ownership you don't have.
       options:

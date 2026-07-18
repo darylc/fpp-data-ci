@@ -13,7 +13,7 @@
 # RESCANNING: the fix for a failed scan almost always lives in the submitter's OWN
 # repo, not the issue body — so "edit the issue to re-trigger" (which does work, since
 # this also listens for `edited`) isn't the natural way anyone asks for a re-check.
-# Same problem, same solution as delist-verify.yml: a comment containing `/recheck`
+# Same problem, same solution as remove-plugin-verify.yml: a comment containing `/recheck`
 # re-runs the scan against the (unchanged) issue body, re-fetching pluginInfo.json and
 # re-cloning the repo fresh each time so it sees whatever was just pushed.
 #

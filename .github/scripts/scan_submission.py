@@ -4,10 +4,11 @@ Reuses the same checks as the retroactive fpp<major> campaign (lint_plugin.py, t
 pluginInfo.json schema check, and the repo-metadata checks — all shared via
 lib_plugin_schema.py so the two scanners can't quietly drift apart), but gates HARDER:
 a plugin that's already listed keeps working if it picks up a BEST_PRACTICE finding
-after the fact — campaign findings are advisory, they never block or delist on their
-own. A plugin asking to be listed for the FIRST time has no such grandfathering: here,
-BEST_PRACTICE findings block same as BLOCKER, not just advisory. OPTIONAL stays
-advisory in both cases (LICENSE/README/icon/bugURL are nice-to-have, not a gate).
+after the fact — campaign findings are advisory, they never block a listing or trigger
+its removal on their own. A plugin asking to be listed for the FIRST time has no such
+grandfathering: here, BEST_PRACTICE findings block same as BLOCKER, not just advisory.
+OPTIONAL stays advisory in both cases (LICENSE/README/icon/bugURL are nice-to-have,
+not a gate).
 
 Usage:
   scan_submission.py --plugininfo-url <raw pluginInfo.json URL> --repo-name <repoName> \

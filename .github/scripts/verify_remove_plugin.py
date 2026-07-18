@@ -1,6 +1,6 @@
-"""Verify that a de-list request comes from the plugin's owner.
+"""Verify that a Request Plugin Removal issue comes from the plugin's owner.
 
-Runs when a `delist-request` issue is opened/edited. GitHub has already
+Runs when a `removal-request` issue is opened/edited. GitHub has already
 AUTHENTICATED the issue author, so `ISSUE_AUTHOR` is their real login — the job
 is only to decide whether that login owns the named plugin's repo.
 
@@ -55,8 +55,10 @@ def resolve_owner(repo_name: str, plugin_list_path: str, token):
                 return None, None, False, False, f"couldn't fetch pluginInfo.json: {err}"
             info = info or {}
             # Proof-of-control: an author with write access set delist:true in their
-            # OWN pluginInfo.json. Only a writer could, so it proves control even for
-            # an org repo — and it doubles as the machine-readable de-list signal.
+            # OWN pluginInfo.json ("delist" is pluginInfo.schema.json's actual field
+            # name — an external contract, not renamed here). Only a writer could, so
+            # it proves control even for an org repo — and it doubles as the
+            # machine-readable removal signal.
             delist = bool(info.get("delist"))
             src = lib.parse_github_repo(info.get("srcURL", "") or "")
             if not src:
@@ -74,7 +76,7 @@ def resolve_owner(repo_name: str, plugin_list_path: str, token):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--plugin-list", default="pluginList.json")
-    ap.add_argument("--output", default="delist-verify.md")
+    ap.add_argument("--output", default="removal-verify.md")
     args = ap.parse_args()
 
     author = (os.environ.get("ISSUE_AUTHOR") or "").strip()
@@ -104,7 +106,7 @@ def main():
             verdict, msg = "report", (
                 f"📋 Third-party report received for `{owner}/{repo}` — thanks for flagging it. "
                 f"This is **not** applied automatically; only the plugin's own owner can do that.\n\n"
-                f"{lib.owner_ref(owner)} — if you'd like this plugin removed, open your own de-list "
+                f"{lib.owner_ref(owner)} — if you'd like this plugin removed, open your own removal "
                 f"request or set `\"delist\": true` in your `pluginInfo.json` (we'll detect it "
                 f"automatically, no need to comment). If you disagree with removal, please say so "
                 f"in a comment here. If there's no response within 7 days, this will be flagged for "
@@ -122,7 +124,7 @@ def main():
                                         f"with write access could set that.")
         elif gone:
             verdict, msg = "verified", (f"`{owner}/{repo}` is archived or no longer reachable — "
-                                        f"de-listing is justified regardless of who asked.")
+                                        f"removal is justified regardless of who asked.")
         elif author and owner and author.lower() == owner.lower():
             verdict, msg = "verified", (f"✅ Ownership confirmed: **@{author}** is the owner of "
                                         f"`{owner}/{repo}`.")
@@ -136,7 +138,7 @@ def main():
                 f"— no need to open a new issue.")
 
     with open(args.output, "w", encoding="utf-8") as f:
-        f.write(f"### De-list ownership check — `{verdict}`\n\n{msg}\n")
+        f.write(f"### Plugin removal ownership check — `{verdict}`\n\n{msg}\n")
     out = os.environ.get("GITHUB_OUTPUT")
     if out:
         with open(out, "a", encoding="utf-8") as f:

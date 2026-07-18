@@ -32,7 +32,7 @@ from lint_plugin import lint_plugin_dir, BLOCKER, BEST_PRACTICE, OPTIONAL
 
 GUIDELINES = "https://github.com/FalconChristmas/fpp-plugin-Template/blob/master/PLUGIN_GUIDELINES.md"
 FORMAT_DOC = "https://github.com/FalconChristmas/fpp-plugin-Template/blob/master/PLUGININFO_FORMAT.md"
-DELIST_FORM = "https://github.com/FalconChristmas/fpp-data/issues/new?template=plugin-delist.yml"
+REMOVAL_FORM = "https://github.com/FalconChristmas/fpp-data/issues/new?template=submit_remove_plugin.yml"
 STALE_MONTHS = 18
 
 
@@ -111,11 +111,14 @@ def scan_plugin(entry, target, plugins_dir, token, schema):
         if schema_err:
             findings.append((BLOCKER, "schema", schema_err))
 
-    # --- author-requested de-list (machine signal / proof-of-control) --------
-    delisted = bool(info.get("delist"))
-    if delisted:
-        findings.append((OPTIONAL, "delist",
-                         "author set \"delist\": true in pluginInfo.json — de-list requested"))
+    # --- author-requested removal (machine signal / proof-of-control) --------
+    # NOTE: "delist" is pluginInfo.schema.json's actual field name (an external
+    # contract plugin authors' own repos already use) — do not rename the key itself,
+    # only the surrounding prose/identifiers.
+    removal_requested = bool(info.get("delist"))
+    if removal_requested:
+        findings.append((OPTIONAL, "removal-requested",
+                         "author set \"delist\": true in pluginInfo.json — plugin removal requested"))
 
     # --- version compatibility (the primary campaign signal) ----------------
     versions = info.get("versions") or []
@@ -141,8 +144,8 @@ def scan_plugin(entry, target, plugins_dir, token, schema):
 
     # --- status --------------------------------------------------------------
     stale = months_since(meta.get("pushed_at"))
-    if delisted:
-        status = "delist-requested"
+    if removal_requested:
+        status = "removal-requested"
     elif certified:
         status = "compatible"
     elif meta.get("archived") or (stale is not None and stale >= STALE_MONTHS):
@@ -155,7 +158,7 @@ def scan_plugin(entry, target, plugins_dir, token, schema):
         "owner": owner,
         "status": status,
         "certified": certified,
-        "delisted": delisted,
+        "removal_requested": removal_requested,
         "issues_enabled": meta.get("has_issues"),
         "archived": meta.get("archived"),
         "months_since_push": stale,
@@ -168,7 +171,7 @@ def scan_plugin(entry, target, plugins_dir, token, schema):
 
 
 ICON = {"compatible": "✅", "needs-update": "🔧", "unmaintained": "💤",
-        "delist-requested": "🗑️"}
+        "removal-requested": "🗑️"}
 
 
 def issue_body(r, target):
@@ -183,9 +186,9 @@ def issue_body(r, target):
     L.append("")
     if r["status"] == "unmaintained":
         push = f"{r['months_since_push']} months" if r["months_since_push"] is not None else "a long time"
-        L.append(f"> 💤 No activity in {push} — if you'd like to retire this plugin instead of "
-                 f"updating it, please open a [de-list request]({DELIST_FORM}) and we'll remove it "
-                 f"from the list, no update needed.")
+        L.append(f"> 💤 No activity in {push} — if you'd like to remove this plugin instead of "
+                 f"updating it, please open a [Request Plugin Removal]({REMOVAL_FORM}) issue and "
+                 f"we'll remove it from the list, no update needed.")
         L.append("")
     # compatibility
     if r["certified"]:
@@ -212,8 +215,8 @@ def issue_body(r, target):
     L.append(f"Please review the [Plugin Guidelines]({GUIDELINES}) and "
              f"[pluginInfo.json format]({FORMAT_DOC}).")
     L.append("")
-    L.append(f"**Retiring this plugin instead?** Open a [de-list request]({DELIST_FORM}) and we'll "
-             f"remove it from the list — no update needed.")
+    L.append(f"**Removing this plugin instead?** Open a [Request Plugin Removal]({REMOVAL_FORM}) "
+             f"issue and we'll remove it from the list — no update needed.")
     return "\n".join(L)
 
 

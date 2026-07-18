@@ -25,8 +25,8 @@ Building the plugin itself? Start from
 — it has the `pluginInfo.json` format reference, plugin guidelines, and a
 working skeleton to fork.
 
-## Retiring a plugin
+## Removing a plugin
 
-Open a [**Retire / de-list**](../../issues/new?template=plugin-delist.yml)
+Open a [**Request Plugin Removal**](../../issues/new?template=submit_remove_plugin.yml)
 issue. Existing installs are unaffected; the entry is just removed from
 `pluginList.json`.

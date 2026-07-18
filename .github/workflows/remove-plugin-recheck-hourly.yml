@@ -1,5 +1,5 @@
-# Hourly sweep for stuck de-list requests -- see recheck_delist_issues.py for
-# the full "why" (short version: pushing `"delist": true` to a plugin's own
+# Hourly sweep for stuck plugin-removal requests -- see recheck_remove_plugin_issues.py
+# for the full "why" (short version: pushing `"delist": true` to a plugin's own
 # repo has no webhook connection back here, so nothing notifies us; this is
 # what actually picks it up without requiring the submitter to remember to
 # come back and comment /recheck).
@@ -10,7 +10,7 @@
 # call, no further API usage) when there are none. So "only checks when
 # there's something to check" is enforced inside the job, not the trigger.
 
-name: Hourly de-list recheck
+name: Hourly plugin removal recheck
 
 on:
   schedule:
@@ -35,9 +35,9 @@ jobs:
 
       - run: pip install jsonschema
 
-      - name: Recheck stuck de-list requests
+      - name: Recheck stuck plugin removal requests
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          python .github/scripts/recheck_delist_issues.py --plugin-list pluginList.json
+          python .github/scripts/recheck_remove_plugin_issues.py --plugin-list pluginList.json

@@ -14,7 +14,7 @@
 # A CI check (validate-pluginlist) asserts these two lists still match so they can't drift.
 
 name: "Workflow processor (do not use)"
-#description: Do not open this directly — use the guided submission page instead (link at the bottom of the New Issue chooser).
+description: Do not open this directly — use the guided submission page instead (link at the bottom of the New Issue chooser).
 title: "[Plugin] <your-repoName>"
 labels: ["plugin", "submission"]
 body:

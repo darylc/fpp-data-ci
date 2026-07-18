@@ -1,0 +1,120 @@
+# Compliance scan for brand-new plugin submissions.
+#
+# WHY: check-submission-token.yml only guards the contact token; nothing else was
+# checked automatically on a new "Submit a plugin" issue before a human reviewed it
+# by hand. This reuses the same linter (lint_plugin.py) and pluginInfo.json schema
+# the fpp<major> compliance campaign already runs against LISTED plugins, but gates
+# harder — see scan_submission.py's docstring: a brand-new submission has no
+# grandfathering, so BEST_PRACTICE findings block here too, not just BLOCKER.
+#
+# Runs on the PUBLIC repo and only ever reads/clones the submitter's own public repo —
+# holds no secrets beyond the default GITHUB_TOKEN used to comment/label.
+
+name: Scan new plugin submission
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  issues: write
+
+jobs:
+  scan:
+    # Identify submissions by BODY SHAPE, not by label — see check-submission-token.yml
+    # for why label-based triggers silently no-op on this repo.
+    if: contains(github.event.issue.body, '### pluginInfo.json raw URL')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - run: pip install jsonschema
+
+      - name: Extract pluginInfo URL + repoName from the issue body
+        id: extract
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.issue.body || '';
+            function field(label) {
+              for (const section of body.split(/^###\s+/m)) {
+                if (new RegExp('^' + label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(section)) {
+                  return section.replace(/^[^\n]*\n/, '').trim();
+                }
+              }
+              return '';
+            }
+            const infoUrl = field('pluginInfo.json raw URL');
+            const repoName = field('repoName');
+            core.setOutput('plugininfo_url', infoUrl === '_No response_' ? '' : infoUrl);
+            core.setOutput('repo_name', repoName === '_No response_' ? '' : repoName);
+
+      - name: Run compliance scan
+        if: steps.extract.outputs.plugininfo_url != ''
+        run: |
+          python .github/scripts/scan_submission.py \
+            --plugininfo-url "${{ steps.extract.outputs.plugininfo_url }}" \
+            --repo-name "${{ steps.extract.outputs.repo_name }}" \
+            --schema .github/schema/pluginInfo.schema.json \
+            --out scan-result.json
+
+      - name: Comment results
+        if: steps.extract.outputs.plugininfo_url != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const MARKER = '<!-- submission-compliance-scan -->';
+            const result = JSON.parse(fs.readFileSync('scan-result.json', 'utf8'));
+
+            const badge = { blocker: '🛑', 'best-practice': '⚠️', optional: '💡' };
+            const label = { blocker: 'Blocker', 'best-practice': 'Best practice', optional: 'Optional' };
+            const order = { blocker: 0, 'best-practice': 1, optional: 2 };
+            const findings = [...result.findings].sort((a, b) => (order[a.severity] ?? 3) - (order[b.severity] ?? 3));
+
+            let msg;
+            if (result.pass) {
+              msg = ['### ✅ Automated compliance scan: passed',
+                     '',
+                     'No blocking issues found. A maintainer will still review this by hand before it\'s added to `pluginList.json`.'];
+            } else {
+              msg = ['### 🛑 Automated compliance scan: needs changes',
+                     '',
+                     `Found ${result.num_blocking} issue(s) that must be fixed before this can be merged ` +
+                     '(new submissions are held to a stricter bar than already-listed plugins — ' +
+                     '`best-practice` findings block here too, not just `blocker`):',
+                     ''];
+              for (const f of findings) {
+                if (f.severity === 'optional') continue;
+                msg.push(`- ${badge[f.severity] || ''} **${label[f.severity] || f.severity} — ${f.code}** — ${f.message}`);
+              }
+            }
+            const optional = findings.filter(f => f.severity === 'optional');
+            if (optional.length) {
+              msg.push('', '<details><summary>💡 Optional polish (not blocking)</summary>', '');
+              for (const f of optional) msg.push(`- ${f.message}`);
+              msg.push('', '</details>');
+            }
+            if (!result.linted) {
+              msg.push('', '_Note: could not clone the repo to run the static lint — only pluginInfo.json itself was checked._');
+            }
+
+            const full = `${MARKER}\n${msg.join('\n')}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.issue.number;
+
+            const comments = await github.rest.issues.listComments({ owner, repo, issue_number });
+            const existing = comments.data.find(c => c.body && c.body.includes(MARKER));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: full });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body: full });
+            }
+
+            if (!result.pass) {
+              await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['needs-manual-review'] });
+            }

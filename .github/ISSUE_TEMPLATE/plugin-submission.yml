@@ -103,15 +103,9 @@ body:
     validations:
       required: true
 
-  - type: input
-    id: author_handle
-    attributes:
-      label: Your GitHub handle
-      description: >
-        Used to @mention/assign you on this issue if changes are needed.
-      placeholder: "@yourhandle"
-    validations:
-      required: true
+  # No "GitHub handle" field: whoever opens this issue is logged into GitHub to do it,
+  # so GitHub already records them as the reporter and auto-subscribes them to replies —
+  # no @-mention needed for a maintainer to reach them.
 
   # CONTACT TOKEN — the ONLY way an email reaches FPP. Never ask for a plain address
   # here: this issue is PUBLIC the instant it's submitted (notifications, API, edit

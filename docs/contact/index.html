@@ -69,8 +69,13 @@
   <fieldset>
     <legend>Your plugin</legend>
 
+    <label for="repo_url">Your plugin's GitHub repo
+      <span class="hint">— we'll read display name, description, repoName and your handle from its pluginInfo.json</span></label>
+    <input id="repo_url" type="text" autocomplete="off" spellcheck="false" placeholder="github.com/you/fpp-AnnouncementAssistant">
+    <div id="fetchMsg" class="msg hint"></div>
+
     <label for="display_name">Plugin display name
-      <span class="hint">— shown in the Plugin Manager</span></label>
+      <span class="hint">— shown in the Plugin Manager; edit if pluginInfo.json got it wrong</span></label>
     <input id="display_name" type="text" autocomplete="off" placeholder="Announcement Assistant">
 
     <label for="repo_name">repoName
@@ -87,9 +92,6 @@
     <label for="description">One-line description</label>
     <input id="description" type="text" autocomplete="off"
            placeholder="Play pre-canned announcements over the show audio.">
-
-    <label for="author_handle">Your GitHub handle</label>
-    <input id="author_handle" type="text" autocomplete="off" spellcheck="false" placeholder="@yourhandle">
 
     <label for="email">Contact email
       <span class="hint">— encrypted here; visible only to FPP maintainers</span></label>
@@ -115,6 +117,26 @@
       <textarea id="tokenOut" readonly spellcheck="false"></textarea>
     </details>
   </fieldset>
+
+  <details>
+    <summary>What happens after I submit?</summary>
+    <ol style="padding-left:1.2rem">
+      <li><strong>The issue is opened under your GitHub account</strong>, so you're notified
+          automatically on any reply — no one needs to @-mention you.</li>
+      <li><strong>Two automated checks run within a minute or two</strong> and comment directly
+          on the issue: one confirms your contact token is well-formed, the other clones your
+          repo and runs the same compliance linter used for already-listed plugins — but a
+          little stricter, since a new plugin doesn't get the grandfathering an existing one
+          has. If it finds anything blocking, the comment tells you exactly what and where.</li>
+      <li><strong>If the scan asks for changes</strong>, fix your repo and edit the issue
+          (any edit, even just re-saving) to re-run the checks.</li>
+      <li><strong>Once the checks pass, a maintainer still reviews it by hand</strong> —
+          category fit, description wording, and anything the automation can't judge — before
+          opening a pull request that adds your plugin to <code>pluginList.json</code>.</li>
+      <li><strong>Once that PR merges</strong>, your plugin appears in everyone's Plugin
+          Manager the next time FPP refreshes its list.</li>
+    </ol>
+  </details>
 </main>
 
 <script>
@@ -200,6 +222,45 @@ fillCategories(CATEGORIES_FALLBACK);
   }
 })();
 
+// Auto-fill display_name/repo_name/plugininfo_url/description from the repo's own
+// pluginInfo.json, so the submitter mostly just confirms rather than retypes what
+// their repo already says. Fields stay editable — pluginInfo.json can be missing,
+// stale, or just wrong, and the maintainer-facing repo_name/plugininfo_url especially
+// need to survive that gracefully rather than silently submitting garbage.
+async function deriveFromRepo() {
+  const fetchMsg = $("fetchMsg");
+  const raw = $("repo_url").value.trim();
+  if (!raw) return;
+
+  const m = raw.match(/^(?:https?:\/\/)?(?:www\.)?github\.com\/([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?\/?$/)
+         || raw.match(/^([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?$/);
+  if (!m) return setMsg(fetchMsg, "Enter your repo as owner/repo or a full github.com URL.", "err");
+  const [, owner, repo] = m;
+
+  setMsg(fetchMsg, "Looking up repo…", "");
+  try {
+    const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
+    if (!repoRes.ok) throw new Error(`repo lookup failed (HTTP ${repoRes.status}) — is it public?`);
+    const branch = (await repoRes.json()).default_branch || "main";
+
+    const infoUrl = `https://raw.githubusercontent.com/${owner}/${repo}/refs/heads/${branch}/pluginInfo.json`;
+    $("plugininfo_url").value = infoUrl;
+
+    const infoRes = await fetch(infoUrl, { cache: "no-store" });
+    if (!infoRes.ok) throw new Error(`no pluginInfo.json at the repo root (HTTP ${infoRes.status})`);
+    const info = await infoRes.json();
+
+    if (info.name) $("display_name").value = info.name;
+    if (info.description) $("description").value = info.description;
+    $("repo_name").value = info.repoName || repo;
+
+    setMsg(fetchMsg, "Loaded from pluginInfo.json — check the fields below before submitting.", "ok");
+  } catch (e) {
+    setMsg(fetchMsg, `Couldn't auto-fill (${e.message}). Fill in the fields below by hand.`, "err");
+  }
+}
+$("repo_url").addEventListener("blur", deriveFromRepo);
+
 function b64(bytes) {
   let s = "";
   for (const b of new Uint8Array(bytes)) s += String.fromCharCode(b);
@@ -208,7 +269,7 @@ function b64(bytes) {
 const wrap = (s) => s.replace(/(.{72})/g, "$1\n").trim();
 
 // Fields that go straight onto the public issue, mapped to the form's field ids.
-const PUBLIC_FIELDS = ["display_name", "repo_name", "plugininfo_url", "category", "description", "author_handle"];
+const PUBLIC_FIELDS = ["display_name", "repo_name", "plugininfo_url", "category", "description"];
 
 async function generate() {
   const msg = $("msg");
@@ -217,7 +278,7 @@ async function generate() {
 
   for (const [id, label] of [["display_name","display name"], ["repo_name","repoName"],
                              ["plugininfo_url","pluginInfo.json URL"], ["category","category"],
-                             ["description","description"], ["author_handle","GitHub handle"]]) {
+                             ["description","description"]]) {
     if (!v[id]) return setMsg(msg, `Please fill in the ${label}.`, "err");
   }
   if (!/^[A-Za-z0-9._-]+$/.test(v.repo_name))

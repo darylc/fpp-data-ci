@@ -92,15 +92,30 @@ def main():
         owner, repo, gone, delist, err = resolve_owner(repo_name, args.plugin_list, token)
         if err:
             verdict, msg = "error", f"Could not resolve `{repo_name}` for this report: {err}"
+        elif delist or gone:
+            # Owner already proved control (or the repo's gone) -- no need to wait
+            # on anyone, this is functionally the same as an owner-verified request.
+            verdict, msg = "verified", (
+                f"✅ Third-party report for `{owner}/{repo}`, but " +
+                (f"`pluginInfo.json` already declares `\"delist\": true`"
+                 if delist else "the repo is archived or no longer reachable") +
+                f" — applying immediately, no waiting period needed.")
         else:
             verdict, msg = "report", (
                 f"📋 Third-party report received for `{owner}/{repo}` — thanks for flagging it. "
-                f"This is **not** applied automatically (only the plugin's own owner can trigger "
-                f"that); a maintainer will look into whether it should be de-listed.")
+                f"This is **not** applied automatically; only the plugin's own owner can do that.\n\n"
+                f"{lib.owner_ref(owner)} — if you'd like this plugin removed, open your own de-list "
+                f"request or set `\"delist\": true` in your `pluginInfo.json` (we'll detect it "
+                f"automatically, no need to comment). If you disagree with removal, please say so "
+                f"in a comment here. If there's no response within 7 days, this will be flagged for "
+                f"the FPP team to review manually.")
     else:
         owner, repo, gone, delist, err = resolve_owner(repo_name, args.plugin_list, token)
         if err:
-            verdict, msg = "error", f"Could not verify `{repo_name}`: {err}"
+            verdict, msg = "error", (
+                f"Could not verify `{repo_name}`: {err}\n\n"
+                f"Fixed the repoName (typo, casing, etc.)? Edit this issue's description with the "
+                f"correct value and we'll automatically re-check — no need to open a new issue.")
         elif delist:
             verdict, msg = "verified", (f"✅ Proof-of-control confirmed: `{owner}/{repo}`'s "
                                         f"`pluginInfo.json` declares `\"delist\": true` — only someone "
@@ -116,8 +131,9 @@ def main():
                 f"⚠️ **@{author}** is not the direct owner of `{owner}/{repo}` "
                 f"(it may be org-owned). GitHub won't confirm your write access to us, so please "
                 f"**prove control**: set `\"delist\": true` in the plugin's `pluginInfo.json` and push "
-                f"it (only someone with write access can). We'll detect it automatically. A maintainer "
-                f"will review either way.")
+                f"it (only someone with write access can).\n\n"
+                f"Once it's pushed, comment `/recheck` on this issue and we'll re-verify automatically "
+                f"— no need to open a new issue.")
 
     with open(args.output, "w", encoding="utf-8") as f:
         f.write(f"### De-list ownership check — `{verdict}`\n\n{msg}\n")

@@ -24,12 +24,22 @@
 # just that prefix rather than a confusing "<your-repoName>" placeholder) to
 # "[De-list plugin request] <repoName>" using what the submitter typed, so the
 # issue queue is scannable at a glance.
+#
+# RECHECKING: an "unconfirmed" or "error" verdict tells the submitter to fix
+# something (set delist:true, fix a typo'd repoName) -- but re-editing the
+# original issue body isn't how anyone naturally interacts with an issue, and
+# closing + re-lodging a new one loses the thread for something this small.
+# A comment containing `/recheck` re-runs verification against the (unchanged)
+# issue body -- e.g. useful after pushing delist:true, which this job can't
+# see until it re-fetches pluginInfo.json.
 
 name: Verify de-list ownership
 
 on:
   issues:
     types: [opened, edited]
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: write
@@ -37,8 +47,12 @@ permissions:
 
 jobs:
   verify:
-    # Only for de-list requests (the form applies this label).
-    if: contains(github.event.issue.labels.*.name, 'delist-request')
+    # Only for de-list requests (the form applies this label), and for a comment
+    # trigger, only when it's actually the /recheck command -- otherwise every
+    # comment on a delist-request issue would re-run this.
+    if: >-
+      contains(github.event.issue.labels.*.name, 'delist-request') &&
+      (github.event_name != 'issue_comment' || contains(github.event.comment.body, '/recheck'))
     runs-on: ubuntu-latest
     steps:
       - name: Check out fpp-data

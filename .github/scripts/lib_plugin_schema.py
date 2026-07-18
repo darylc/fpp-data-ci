@@ -16,6 +16,24 @@ from typing import Any, Optional
 USER_AGENT = "fpp-data-plugin-ci"
 HTTP_TIMEOUT = 15  # seconds — generous for CI, still bounded
 
+# The rest of this campaign's CI NEVER @-mentions an author (see sync_issues.py,
+# campaign_scan.py) -- bulk scans pinging authors would be spam. The de-list-report
+# flow is a deliberate, narrow exception: notifying an owner that THEIR OWN plugin
+# was reported as abandoned is closer to "you should know about this" than a bulk
+# scan is. Held off for now (plain text, no real notification) until release;
+# flip this one flag then -- every caller goes through owner_ref() below.
+MENTION_OWNER = False
+
+
+def owner_ref(login: str) -> str:
+    """A plugin owner's GitHub login, formatted per MENTION_OWNER.
+
+    True: a real "@login" -- GitHub sends them a notification.
+    False (default): backtick-wrapped plain text -- same convention the rest of
+    this repo's CI uses ("no leading @, so nobody's pinged").
+    """
+    return f"@{login}" if MENTION_OWNER else f"`{login}`"
+
 
 def fetch_json(url: str) -> tuple[Optional[Any], Optional[str]]:
     """GET a URL and parse JSON. Returns (data, error). One is always None."""

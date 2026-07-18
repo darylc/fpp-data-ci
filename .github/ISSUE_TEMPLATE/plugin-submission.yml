@@ -15,7 +15,7 @@
 
 name: "Workflow processor (do not use)"
 description: Do not open this directly — use the guided submission page instead (link at the bottom of the New Issue chooser).
-title: "[New Plugin Submission]"
+title: "[New Plugin Submission - do not edit this title]"
 labels: ["plugin", "submission"]
 body:
   - type: markdown

@@ -200,8 +200,9 @@ def issue_body(r, target, draft=True):
     if r["status"] == "unmaintained":
         push = f"{r['months_since_push']} months" if r["months_since_push"] is not None else "a long time"
         L.append(f"> 💤 No activity in {push} — if you'd like to remove this plugin instead of "
-                 f"updating it, please open a [Request Plugin Removal]({REMOVAL_FORM}) issue and "
-                 f"we'll remove it from the list, no update needed.")
+                 f"updating it, start at the [guided removal page]({REMOVAL_GUIDED_PAGE}) or open a "
+                 f"[Request Plugin Removal]({REMOVAL_FORM}) issue and we'll remove it from the list, "
+                 f"no update needed.")
         L.append("")
     # compatibility
     if r["certified"]:
@@ -229,8 +230,10 @@ def issue_body(r, target, draft=True):
     L.append(f"Please review the [Plugin Guidelines]({GUIDELINES}) and "
              f"[pluginInfo.json format]({FORMAT_DOC}).")
     L.append("")
-    L.append(f"**Removing this plugin instead?** Open a [Request Plugin Removal]({REMOVAL_FORM}) "
-             f"issue and we'll remove it from the list — no update needed.")
+    L.append(f"**Removing this plugin instead?** Start at the [guided removal page]"
+             f"({REMOVAL_GUIDED_PAGE}) (fills in the repoName for you), or open a "
+             f"[Request Plugin Removal]({REMOVAL_FORM}) issue directly — we'll remove it from the "
+             f"list, no update needed.")
     return "\n".join(L)
 
 

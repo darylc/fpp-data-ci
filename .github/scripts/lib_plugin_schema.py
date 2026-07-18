@@ -33,6 +33,38 @@ def fetch_json(url: str) -> tuple[Optional[Any], Optional[str]]:
         return None, f"invalid JSON at {url}: {e}"
 
 
+def resolve_repo_name(value: str) -> str:
+    """Accept a bare repoName OR a GitHub URL and return just the repo name.
+
+    Submitters of the de-list Issue Form often paste a URL into the "Plugin
+    repoName" field instead of the bare name FPP actually stores in
+    pluginList.json — a repo page (`github.com/<owner>/<repo>`, with or without
+    `.git`, `/issues`, `/blob/<branch>/pluginInfo.json`, ...) or a raw file URL
+    (`raw.githubusercontent.com/<owner>/<repo>/<branch>/pluginInfo.json`). Be
+    forgiving rather than failing the request outright: `repoName` is required
+    (by CONTRIBUTING.md) to match the GitHub repo name, so the repo segment of
+    either URL shape IS the repoName.
+    """
+    v = (value or "").strip()
+    if not v or ("github.com" not in v and "githubusercontent.com" not in v):
+        return v
+    try:
+        from urllib.parse import urlparse
+
+        u = urlparse(v if "://" in v else "https://" + v)
+    except Exception:  # noqa: BLE001
+        return v
+    if not u.hostname or ("github.com" not in u.hostname and "githubusercontent.com" not in u.hostname):
+        return v
+    parts = [p for p in u.path.split("/") if p]
+    if len(parts) < 2:
+        return v
+    repo = parts[1]
+    if repo.endswith(".git"):
+        repo = repo[:-4]
+    return repo
+
+
 def parse_github_repo(url: str) -> Optional[tuple[str, str]]:
     """Return (owner, repo) for a github.com URL, else None.
 

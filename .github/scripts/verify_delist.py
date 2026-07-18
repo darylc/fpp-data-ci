@@ -73,7 +73,7 @@ def main():
     author = (os.environ.get("ISSUE_AUTHOR") or "").strip()
     body = os.environ.get("ISSUE_BODY") or ""
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-    repo_name = field(body, "Plugin repoName") or field(body, "repoName")
+    repo_name = lib.resolve_repo_name(field(body, "Plugin repoName") or field(body, "repoName"))
 
     if not repo_name:
         verdict, msg = "error", "Could not read a **Plugin repoName** from the form."

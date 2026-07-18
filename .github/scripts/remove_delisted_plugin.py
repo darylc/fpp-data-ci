@@ -18,6 +18,8 @@ import argparse
 import os
 import re
 
+import lib_plugin_schema as lib
+
 ENTRY_RE = re.compile(r'^(\s*)\[\s*"([^"]+)"')
 
 
@@ -64,8 +66,10 @@ def main():
     ap.add_argument("--repo-name")
     args = ap.parse_args()
 
-    repo_name = args.repo_name or field(os.environ.get("ISSUE_BODY") or "", "Plugin repoName") \
+    repo_name = args.repo_name or lib.resolve_repo_name(
+        field(os.environ.get("ISSUE_BODY") or "", "Plugin repoName")
         or field(os.environ.get("ISSUE_BODY") or "", "repoName")
+    )
 
     out = os.environ.get("GITHUB_OUTPUT")
 

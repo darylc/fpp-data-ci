@@ -40,6 +40,13 @@
   code { background:var(--code); padding:.1rem .3rem; border-radius:4px; font-size:.85em; }
   details { margin-top:1rem; font-size:.85rem; color:var(--muted); }
   summary { cursor:pointer; }
+  /* #confirmDetails holds real form fields (not a muted footnote like the other
+     <details> blocks), so give it back normal size/color and a border to read as
+     part of the form rather than supplementary text. */
+  #confirmDetails { font-size:1rem; color:var(--fg); border:1px solid var(--line);
+                     border-radius:6px; padding:.6rem .8rem; }
+  #confirmDetails summary { font-weight:600; font-size:.9rem; }
+  #confirmDetails label:first-of-type { margin-top:.2rem; }
   /* The logo asset ships white (built for FPP's dark header). The inlined copy below
      uses currentColor instead, so it stays visible in light mode too. */
   header { display:flex; align-items:center; gap:.85rem; margin-bottom:1.4rem; }
@@ -70,28 +77,33 @@
     <legend>Your plugin</legend>
 
     <label for="repo_url">Your plugin's GitHub repo
-      <span class="hint">— we'll read display name, description, repoName and your handle from its pluginInfo.json</span></label>
+      <span class="hint">— we'll read display name, description and repoName from its pluginInfo.json</span></label>
     <input id="repo_url" type="text" autocomplete="off" spellcheck="false" placeholder="github.com/you/fpp-AnnouncementAssistant">
     <div id="fetchMsg" class="msg hint"></div>
-
-    <label for="display_name">Plugin display name
-      <span class="hint">— shown in the Plugin Manager; edit if pluginInfo.json got it wrong</span></label>
-    <input id="display_name" type="text" autocomplete="off" placeholder="Announcement Assistant">
-
-    <label for="repo_name">repoName
-      <span class="hint">— must match the <code>repoName</code> in your pluginInfo.json</span></label>
-    <input id="repo_name" type="text" autocomplete="off" spellcheck="false" placeholder="fpp-AnnouncementAssistant">
-
-    <label for="plugininfo_url">pluginInfo.json raw URL</label>
-    <input id="plugininfo_url" type="url" autocomplete="off" spellcheck="false"
-           placeholder="https://raw.githubusercontent.com/you/repo/refs/heads/main/pluginInfo.json">
 
     <label for="category">Category</label>
     <select id="category"></select>
 
-    <label for="description">One-line description</label>
-    <input id="description" type="text" autocomplete="off"
-           placeholder="Play pre-canned announcements over the show audio.">
+    <details id="confirmDetails">
+      <summary id="confirmSummary">Plugin details — filled in automatically once we can read your repo</summary>
+      <div style="padding-top:.6rem">
+        <label for="display_name">Plugin display name
+          <span class="hint">— shown in the Plugin Manager; edit if pluginInfo.json got it wrong</span></label>
+        <input id="display_name" type="text" autocomplete="off" placeholder="Announcement Assistant">
+
+        <label for="repo_name">repoName
+          <span class="hint">— must match the <code>repoName</code> in your pluginInfo.json</span></label>
+        <input id="repo_name" type="text" autocomplete="off" spellcheck="false" placeholder="fpp-AnnouncementAssistant">
+
+        <label for="plugininfo_url">pluginInfo.json raw URL</label>
+        <input id="plugininfo_url" type="url" autocomplete="off" spellcheck="false"
+               placeholder="https://raw.githubusercontent.com/you/repo/refs/heads/main/pluginInfo.json">
+
+        <label for="description">One-line description</label>
+        <input id="description" type="text" autocomplete="off"
+               placeholder="Play pre-canned announcements over the show audio.">
+      </div>
+    </details>
 
     <label for="email">Contact email
       <span class="hint">— encrypted here; visible only to FPP maintainers</span></label>
@@ -254,8 +266,15 @@ async function deriveFromRepo() {
     if (info.description) $("description").value = info.description;
     $("repo_name").value = info.repoName || repo;
 
-    setMsg(fetchMsg, "Loaded from pluginInfo.json — check the fields below before submitting.", "ok");
+    // Collapse the confirmation block — the submitter can still expand it to check/edit,
+    // but the happy path shouldn't force them to look at four fields they didn't type.
+    $("confirmDetails").open = false;
+    $("confirmSummary").textContent = `✓ ${info.name || repo} (${info.repoName || repo}) — click to edit`;
+    setMsg(fetchMsg, "Loaded from pluginInfo.json.", "ok");
   } catch (e) {
+    // Couldn't auto-fill — force the block open so there's somewhere to type it by hand.
+    $("confirmDetails").open = true;
+    $("confirmSummary").textContent = "Plugin details";
     setMsg(fetchMsg, `Couldn't auto-fill (${e.message}). Fill in the fields below by hand.`, "err");
   }
 }

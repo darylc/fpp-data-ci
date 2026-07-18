@@ -226,31 +226,62 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            const fs = require('fs');
             const { owner, repo } = context.repo;
             const issue_number = context.payload.issue.number;
             const branch = '${{ steps.edit.outputs.branch }}';
             const repoName = '${{ steps.extract.outputs.repo_name }}';
 
+            const result = JSON.parse(fs.readFileSync('scan-result.json', 'utf8'));
+            const badge = { blocker: '🛑', 'best-practice': '⚠️', optional: '💡' };
+            const label = { blocker: 'Blocker', 'best-practice': 'Best practice', optional: 'Optional' };
+            const order = { blocker: 0, 'best-practice': 1, optional: 2 };
+            const blocking = result.findings
+              .filter(f => f.severity !== 'optional')
+              .sort((a, b) => (order[a.severity] ?? 3) - (order[b.severity] ?? 3));
+
+            const lines = [`Adds \`${repoName}\` to \`pluginList.json\`, requested in #${issue_number}.`, ''];
+            if (result.pass) {
+              lines.push('✅ The automated compliance scan passed — no blocking issues found.', '');
+            } else {
+              lines.push(
+                `⚠️ **Opened despite ${blocking.length} unresolved finding(s) below** — the reporter used ` +
+                '`/submit` to ask for review anyway rather than fix them first:', '');
+              for (const f of blocking) {
+                lines.push(`- ${badge[f.severity] || ''} **${label[f.severity] || f.severity} — ${f.code}** — ${f.message}`);
+              }
+              lines.push('');
+            }
+            lines.push(
+              'Schema, repoName match, category, and archived/issues-disabled were already checked before ' +
+              'this PR existed — `validate-pluginlist.yml` will only run here if a maintainer pushes a ' +
+              'hand-edit to this branch before merging.', '',
+              '**Merging is entirely up to a maintainer\'s judgement** — this PR being open is not an approval, ' +
+              'especially if it was opened via `/submit` over unresolved findings above.');
+            const body = lines.join('\n');
+
             const existing = await github.rest.pulls.list({ owner, repo, head: `${owner}:${branch}`, state: 'open' });
             let pr = existing.data[0];
-            const body = `Adds \`${repoName}\` to \`pluginList.json\`, requested in #${issue_number}.\n\n` +
-              'Opened automatically once the submission was ready (compliance scan passed, or the ' +
-              'reporter used `/submit`) — schema, repoName match, category, and archived/issues-disabled ' +
-              'were already checked before this PR existed. `validate-pluginlist.yml` will only run here ' +
-              'if a maintainer pushes a hand-edit to this branch before merging.';
-
             if (!pr) {
               const created = await github.rest.pulls.create({
                 owner, repo, title: `[Plugin] Add ${repoName}`, body, head: branch, base: 'master',
               });
               pr = created.data;
+            } else {
+              // Keep the body fresh — a later /recheck or /submit may change the findings list.
+              await github.rest.pulls.update({ owner, repo, pull_number: pr.number, body });
             }
 
             const MARKER = '<!-- submission-listing-pr -->';
             await github.rest.issues.createComment({
               owner, repo, issue_number,
-              body: `${MARKER}\n📦 Listing PR: ${pr.html_url}`,
+              body: `${MARKER}\n📦 Listing PR: ${pr.html_url}\n\nClosing this issue — further discussion ` +
+                    'happens on the PR now. Merging it is a separate decision for a maintainer to make.',
             });
+
+            // The issue's job is done once a PR exists; whether that PR gets merged is a
+            // separate, later decision that belongs to a maintainer, not this workflow.
+            await github.rest.issues.update({ owner, repo, issue_number, state: 'closed' });
 
       - name: Comment if already listed
         if: steps.comment.outputs.ready == 'true' && startsWith(steps.edit.outputs.status, 'ALREADY_LISTED')
@@ -261,8 +292,9 @@ jobs:
             const issue_number = context.payload.issue.number;
             await github.rest.issues.createComment({
               owner, repo, issue_number,
-              body: `\`${{ steps.extract.outputs.repo_name }}\` is already in \`pluginList.json\` — nothing to do here.`,
+              body: `\`${{ steps.extract.outputs.repo_name }}\` is already in \`pluginList.json\` — nothing to do here. Closing.`,
             });
+            await github.rest.issues.update({ owner, repo, issue_number, state: 'closed' });
 
       - name: Comment if the category couldn't be matched
         if: steps.comment.outputs.ready == 'true' && startsWith(steps.edit.outputs.status, 'UNKNOWN_CATEGORY')

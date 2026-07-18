@@ -28,5 +28,8 @@ working skeleton to fork.
 ## Removing a plugin
 
 Open a [**Request Plugin Removal**](../../issues/new?template=submit_remove_plugin.yml)
-issue. Existing installs are unaffected; the entry is just removed from
-`pluginList.json`.
+issue — or start at the
+[guided page](https://darylc.github.io/fpp-data-ci/submit_remove_plugin/), which fills
+in the repoName for you (no email involved here, so it's a single step, unlike the
+submission flow above). Existing installs are unaffected; the entry is just removed
+from `pluginList.json`.

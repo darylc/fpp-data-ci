@@ -167,16 +167,31 @@ jobs:
             const isSubmitOverride = context.eventName === 'issue_comment' &&
               context.payload.comment.body.includes('/submit');
 
+            // The issue itself no longer has a repo_url/repoName field to ask the submitter
+            // for — both are derived server-side by scan_submission.py from pluginInfo.json.
+            // Surface them here instead so anyone reading the issue still gets a clickable
+            // link and the registered owner without having to open pluginInfo.json by hand.
+            // The owner is named but NOT @-mentioned (no leading @, plain text only) — unlike
+            // the reporter below, they didn't ask for this notification by opening the issue,
+            // so pinging them unprompted would be the same spam problem MENTION_OWNER=False
+            // avoids for the campaign scanner in lib_plugin_schema.py.
+            const repoLine = result.repo_url
+              ? `**Repo:** [${result.repo_name || result.repo_url}](${result.repo_url})` +
+                (result.owner ? ` — owner: \`${result.owner}\`` : '')
+              : null;
+
             let msg;
             if (result.pass) {
               msg = ['### ✅ Automated compliance scan: passed',
-                     '',
-                     `@${reporter} no blocking issues found. A maintainer will still review this by hand before it's added to \`pluginList.json\`.`];
+                     ''];
+              if (repoLine) msg.push(repoLine, '');
+              msg.push(`@${reporter} no blocking issues found. A maintainer will still review this by hand before it's added to \`pluginList.json\`.`);
             } else {
               msg = ['### 🛑 Automated compliance scan: needs changes',
-                     '',
-                     `@${reporter} found ${result.num_blocking} issue(s) that must be fixed before this can be merged:`,
                      ''];
+              if (repoLine) msg.push(repoLine, '');
+              msg.push(`@${reporter} found ${result.num_blocking} issue(s) that must be fixed before this can be merged:`,
+                     '');
               for (const f of findings) {
                 if (f.severity === 'optional') continue;
                 msg.push(`- ${badge[f.severity] || ''} **${label[f.severity] || f.severity} — ${f.code}** — ${f.message}`);

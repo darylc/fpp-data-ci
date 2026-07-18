@@ -16,6 +16,14 @@
 # Same problem, same solution as delist-verify.yml: a comment containing `/recheck`
 # re-runs the scan against the (unchanged) issue body, re-fetching pluginInfo.json and
 # re-cloning the repo fresh each time so it sees whatever was just pushed.
+#
+# OVERRIDING: `needs-manual-review` is a "ready for a maintainer to look at this" flag,
+# not a "something's wrong" flag — so a failing scan does NOT add it. Most failures get
+# fixed and rechecked without ever needing a human in the loop. The label only appears
+# once the submission is actually ready: the scan passes, OR the submitter disagrees
+# with a finding and comments `/submit` to say so explicitly. `/submit` doesn't bypass
+# the scan silently — it still runs and still reports findings, it just adds the label
+# regardless of the result, with a note that the submitter chose to proceed anyway.
 
 name: Scan new plugin submission
 
@@ -32,11 +40,13 @@ jobs:
   scan:
     # Identify submissions by BODY SHAPE, not by label — see check-submission-token.yml
     # for why label-based triggers silently no-op on this repo. For a comment trigger,
-    # only run on the actual `/recheck` command — otherwise every comment on a
-    # submission issue (including our own scan results) would re-run this.
+    # only run on the actual `/recheck` or `/submit` commands — otherwise every comment
+    # on a submission issue (including our own scan results) would re-run this.
     if: >-
       contains(github.event.issue.body, '### pluginInfo.json raw URL') &&
-      (github.event_name != 'issue_comment' || contains(github.event.comment.body, '/recheck'))
+      (github.event_name != 'issue_comment' ||
+       contains(github.event.comment.body, '/recheck') ||
+       contains(github.event.comment.body, '/submit'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -68,6 +78,8 @@ jobs:
 
       - name: Run compliance scan
         if: steps.extract.outputs.plugininfo_url != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # for the archived/issues-disabled/bugURL check
         run: |
           python .github/scripts/scan_submission.py \
             --plugininfo-url "${{ steps.extract.outputs.plugininfo_url }}" \
@@ -95,6 +107,10 @@ jobs:
             // issue the person just opened themselves asking for exactly this feedback.
             const reporter = context.payload.issue.user.login;
 
+            // Which command triggered this run, if any (auto opened/edited => null).
+            const isSubmitOverride = context.eventName === 'issue_comment' &&
+              context.payload.comment.body.includes('/submit');
+
             let msg;
             if (result.pass) {
               msg = ['### ✅ Automated compliance scan: passed',
@@ -109,8 +125,15 @@ jobs:
                 if (f.severity === 'optional') continue;
                 msg.push(`- ${badge[f.severity] || ''} **${label[f.severity] || f.severity} — ${f.code}** — ${f.message}`);
               }
-              msg.push('',
-                       'Push a fix to your repo, then comment `/recheck` here (no need to edit this issue) to re-run the scan.');
+              if (isSubmitOverride) {
+                msg.push('',
+                         `@${reporter} used \`/submit\` to flag this for maintainer review despite the findings above. ` +
+                         'A human will take it from here.');
+              } else {
+                msg.push('',
+                         'Push a fix to your repo, then comment `/recheck` here (no need to edit this issue) to re-run the scan. ' +
+                         'If you believe these checks are wrong and want a maintainer to look anyway, comment `/submit` instead.');
+              }
             }
             const optional = findings.filter(f => f.severity === 'optional');
             if (optional.length) {
@@ -130,11 +153,15 @@ jobs:
             const issue_number = context.payload.issue.number;
             await github.rest.issues.createComment({ owner, repo, issue_number, body: full });
 
-            if (!result.pass) {
+            // needs-manual-review means "ready for a maintainer to look at this", so it
+            // only appears once the submission actually IS ready: pass, or an explicit
+            // /submit override. A plain failing scan adds nothing — most submitters fix
+            // and /recheck without ever needing a maintainer in the loop.
+            if (result.pass || isSubmitOverride) {
               await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['needs-manual-review'] });
             } else {
-              // Clear a stale label from an earlier failed scan — a passing /recheck
-              // shouldn't leave the issue looking stuck.
+              // Clear a stale "ready" label if an edit made a previously-passing/overridden
+              // submission start failing again — the label should never lie about status.
               try {
                 await github.rest.issues.removeLabel({ owner, repo, issue_number, name: 'needs-manual-review' });
               } catch (e) {

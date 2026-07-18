@@ -35,6 +35,8 @@ jobs:
         with:
           python-version: "3.x"
 
+      - run: pip install jsonschema
+
       - name: Re-evaluate FPP-${{ env.TARGET_MAJOR }} compatibility (metadata only)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -42,6 +44,7 @@ jobs:
           python .github/scripts/campaign_scan.py \
             --target-major "$TARGET_MAJOR" \
             --plugin-list pluginList.json \
+            --schema .github/schema/pluginInfo.schema.json \
             --out out
 
       - name: Close issues for plugins that became compatible

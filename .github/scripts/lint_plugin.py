@@ -74,8 +74,13 @@ def _grep(root, pattern, exts=SCRIPT_EXT, flags=re.I):
                 yield rel, i, line.strip()
 
 
-def lint_plugin_dir(root: str, repo_name: str | None = None) -> list[Finding]:
-    """Run all static checks against a plugin working tree; return findings."""
+def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None = None) -> list[Finding]:
+    """Run all static checks against a plugin working tree; return findings.
+
+    `info` is the plugin's already-parsed pluginInfo.json, if the caller has it (both
+    campaign_scan.py and scan_submission.py load it anyway) — used for checks that need
+    to cross-reference the manifest against the working tree, like the icon check.
+    """
     out: list[Finding] = []
     repo = repo_name or os.path.basename(os.path.normpath(root))
     names = os.listdir(root) if os.path.isdir(root) else []
@@ -229,6 +234,18 @@ def lint_plugin_dir(root: str, repo_name: str | None = None) -> list[Finding]:
         out.append(Finding(OPTIONAL, "no-license", "no LICENSE file — add one for redistribution clarity"))
     if not any(n.startswith("readme") for n in lower):
         out.append(Finding(OPTIONAL, "no-readme", "no README file"))
+
+    # Icon: FPP prefers a local icon.png (renders offline once installed) and falls back
+    # to iconURL (also the ONLY option for a pre-install Plugin Manager thumbnail, since
+    # there's no local checkout yet at that point). Neither present => initials fallback
+    # everywhere. See www/api/controllers/plugin.php's PluginServeIcon().
+    has_icon_url = bool((info or {}).get("iconURL"))
+    if "icon.png" not in lower and not has_icon_url:
+        out.append(Finding(OPTIONAL, "no-icon",
+                   "no icon.png in the repo root and no iconURL in pluginInfo.json — the Plugin "
+                   "Manager will show your initials instead of an icon. A local icon.png (128x128 "
+                   "or 256x256, repo root) is preferred since it renders offline once installed; "
+                   "iconURL is the fallback and the only option shown before install"))
 
     # installs a systemd unit but ships no uninstall script
     if first(r'/etc/systemd/system/|systemctl\s+enable') and \

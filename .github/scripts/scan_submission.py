@@ -1,12 +1,13 @@
 """Compliance scan for a brand-new plugin submission issue.
 
-Reuses the same checks as the retroactive fpp<major> campaign (lint_plugin.py +
-the pluginInfo.json schema in validate_pluginlist.py), but gates HARDER: a plugin
-that's already listed keeps working if it picks up a BEST_PRACTICE finding after
-the fact — campaign findings are advisory, they never block or delist on their
-own. A plugin asking to be listed for the FIRST time has no such grandfathering:
-here, BEST_PRACTICE findings block same as BLOCKER, not just advisory. OPTIONAL
-stays advisory in both cases (LICENSE/README/bugURL are nice-to-have, not a gate).
+Reuses the same checks as the retroactive fpp<major> campaign (lint_plugin.py, the
+pluginInfo.json schema check, and the repo-metadata checks — all shared via
+lib_plugin_schema.py so the two scanners can't quietly drift apart), but gates HARDER:
+a plugin that's already listed keeps working if it picks up a BEST_PRACTICE finding
+after the fact — campaign findings are advisory, they never block or delist on their
+own. A plugin asking to be listed for the FIRST time has no such grandfathering: here,
+BEST_PRACTICE findings block same as BLOCKER, not just advisory. OPTIONAL stays
+advisory in both cases (LICENSE/README/icon/bugURL are nice-to-have, not a gate).
 
 Usage:
   scan_submission.py --plugininfo-url <raw pluginInfo.json URL> --repo-name <repoName> \
@@ -18,25 +19,23 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
-import shutil
 import subprocess
 import sys
 import tempfile
 
-import jsonschema
-
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from lib_plugin_schema import fetch_json, parse_github_repo  # noqa: E402
+from lib_plugin_schema import (  # noqa: E402
+    fetch_json,
+    gh_get_repo,
+    parse_github_repo,
+    parse_raw_github_repo,
+    repo_metadata_findings,
+    repo_name_mismatch,
+    schema_validation_error,
+)
 from lint_plugin import lint_plugin_dir, BLOCKER, BEST_PRACTICE, OPTIONAL  # noqa: E402
 
 CLONE_TIMEOUT = 60  # seconds
-
-
-def parse_raw_github_repo(url: str):
-    """(owner, repo) from a raw.githubusercontent.com pluginInfo.json URL, else None."""
-    m = re.match(r"^https?://raw\.githubusercontent\.com/([^/]+)/([^/]+)/", url or "")
-    return (m.group(1), m.group(2)) if m else None
 
 
 def clone_repo(owner: str, repo: str, dest: str) -> str | None:
@@ -62,6 +61,7 @@ def main():
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     findings = []  # (severity, code, message)
 
     info, err = fetch_json(args.plugininfo_url)
@@ -72,21 +72,25 @@ def main():
     if info:
         with open(args.schema, encoding="utf-8") as f:
             schema = json.load(f)
-        try:
-            jsonschema.validate(info, schema)
-        except jsonschema.ValidationError as e:
-            loc = "/".join(str(p) for p in e.absolute_path) or "(root)"
-            findings.append((BLOCKER, "schema", f"pluginInfo.json fails schema at `{loc}`: {e.message}"))
+        schema_err = schema_validation_error(info, schema)
+        if schema_err:
+            findings.append((BLOCKER, "schema", schema_err))
 
-        if args.repo_name and info.get("repoName") and info["repoName"] != args.repo_name:
-            findings.append((BLOCKER, "repo-name-mismatch",
-                              f"pluginInfo.json repoName '{info['repoName']}' does not match "
-                              f"the submitted repoName '{args.repo_name}'"))
+        mismatch = repo_name_mismatch(info, args.repo_name)
+        if mismatch:
+            findings.append((BLOCKER, "repo-name-mismatch", mismatch))
+
+    # --- repo metadata (archived / issues-disabled / bugURL) --------------------
+    gh = parse_github_repo(info.get("srcURL", "") or "") if info else None
+    gh = gh or parse_raw_github_repo(args.plugininfo_url)
+    if gh:
+        owner, repo = gh
+        meta, _ = gh_get_repo(owner, repo, token)
+        if meta:
+            findings.extend(repo_metadata_findings(meta, (info or {}).get("bugURL", "")))
 
     # --- clone + static lint --------------------------------------------------
     linted = False
-    src = info.get("srcURL") if info else None
-    gh = parse_github_repo(src or "") or parse_raw_github_repo(args.plugininfo_url)
     if gh:
         owner, repo = gh
         with tempfile.TemporaryDirectory() as tmp:
@@ -96,7 +100,7 @@ def main():
                 findings.append((BLOCKER, "clone-failed", clone_err))
             else:
                 linted = True
-                for f in lint_plugin_dir(dest, args.repo_name or repo):
+                for f in lint_plugin_dir(dest, args.repo_name or repo, info=info):
                     findings.append((f.severity, f.code, f.message))
     else:
         findings.append((BLOCKER, "no-repo-url",

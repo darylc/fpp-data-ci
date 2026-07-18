@@ -104,6 +104,8 @@ jobs:
         with:
           python-version: "3.x"
 
+      - run: pip install jsonschema
+
       - name: Verify ownership
         id: verify
         env:

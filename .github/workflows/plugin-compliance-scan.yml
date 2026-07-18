@@ -46,6 +46,8 @@ jobs:
         with:
           python-version: "3.x"
 
+      - run: pip install jsonschema
+
       - name: Clone all listed plugins
         run: |
           python .github/scripts/clone_plugins.py \
@@ -59,6 +61,7 @@ jobs:
             --target-major "${{ inputs.target_major }}" \
             --plugin-list pluginList.json \
             --plugins-dir plugins \
+            --schema .github/schema/pluginInfo.schema.json \
             --limit "${{ inputs.limit }}" \
             --out out
 

@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from typing import Any, Optional
+
+import jsonschema
 
 USER_AGENT = "fpp-data-plugin-ci"
 HTTP_TIMEOUT = 15  # seconds — generous for CI, still bounded
@@ -103,6 +106,64 @@ def parse_github_repo(url: str) -> Optional[tuple[str, str]]:
     if repo.endswith(".git"):
         repo = repo[:-4]
     return owner, repo
+
+
+def parse_raw_github_repo(url: str) -> Optional[tuple[str, str]]:
+    """(owner, repo) from a raw.githubusercontent.com file URL, else None.
+
+    Complements parse_github_repo() above, which only handles github.com repo pages —
+    a pluginInfo.json URL is a raw.githubusercontent.com file URL instead, and is
+    sometimes the only URL a caller has (e.g. a submission with no srcURL yet).
+    """
+    m = re.match(r"^https?://raw\.githubusercontent\.com/([^/]+)/([^/]+)/", url or "")
+    return (m.group(1), m.group(2)) if m else None
+
+
+def schema_validation_error(info: dict, schema: dict) -> Optional[str]:
+    """Validate pluginInfo.json against the schema. Returns a message, or None if valid.
+
+    Severity-free on purpose: validate_pluginlist.py (ERROR/WARNING, downgraded for
+    pre-existing entries not touched by a PR) and the campaign/submission scanners
+    (BLOCKER/BEST_PRACTICE/OPTIONAL) each wrap this in their own severity model rather
+    than sharing one — the two vocabularies don't map onto each other cleanly.
+    """
+    try:
+        jsonschema.validate(info, schema)
+        return None
+    except jsonschema.ValidationError as e:
+        loc = "/".join(str(p) for p in e.absolute_path) or "(root)"
+        return f"pluginInfo.json fails schema at `{loc}`: {e.message}"
+
+
+def repo_name_mismatch(info: dict, expected_name: Optional[str]) -> Optional[str]:
+    """Message if pluginInfo.json's repoName doesn't match the expected one, else None."""
+    if expected_name and info.get("repoName") and info["repoName"] != expected_name:
+        return f"pluginInfo.json repoName '{info['repoName']}' does not match '{expected_name}'"
+    return None
+
+
+def repo_metadata_findings(meta: dict, bug_url: str) -> list[tuple[str, str, str]]:
+    """archived / issues-disabled / bugURL findings from a GitHub API repo response.
+
+    Pure (no network) — the caller already has `meta` from gh_get_repo(). Returns
+    (severity, code, message) tuples using the same string severities as lint_plugin.py's
+    BLOCKER/BEST_PRACTICE/OPTIONAL ("blocker"/"best-practice"/"optional"), so callers can
+    append these directly alongside lint_plugin_dir()'s findings without translation.
+    """
+    out: list[tuple[str, str, str]] = []
+    if not meta:
+        return out
+    if meta.get("archived"):
+        out.append(("best-practice", "archived", "source repo is archived"))
+    has_bug = bool(parse_github_repo(bug_url or ""))
+    # An archived repo is read-only regardless of what has_issues says, so archiving
+    # always implies issues-disabled even if the flag wasn't flipped.
+    if meta.get("has_issues") is False or meta.get("archived"):
+        out.append(("blocker", "issues-disabled",
+                     "GitHub Issues are disabled — users can't report bugs and we can't reach you there"))
+    elif not has_bug:
+        out.append(("optional", "bugurl", "no bugURL set (Report-a-Bug link)"))
+    return out
 
 
 def gh_get_repo(owner: str, repo: str, token: Optional[str]) -> tuple[Optional[dict], Optional[str]]:

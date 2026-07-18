@@ -91,7 +91,7 @@ def load_plugininfo(entry_url, plugin_dir):
     return None, "no pluginInfo source"
 
 
-def scan_plugin(entry, target, plugins_dir, token):
+def scan_plugin(entry, target, plugins_dir, token, schema):
     name = entry[0]
     info_url = entry[1] if len(entry) > 1 else None
     plugin_dir = os.path.join(plugins_dir, name) if plugins_dir else None
@@ -103,6 +103,13 @@ def scan_plugin(entry, target, plugins_dir, token):
     findings = []          # (severity, code, message)
     if err:
         findings.append((BLOCKER, "plugininfo", err))
+
+    # Schema validation — shared with scan_submission.py (and validate_pluginlist.py's
+    # ERROR/WARNING model separately) via lib_plugin_schema.schema_validation_error().
+    if info and schema:
+        schema_err = lib.schema_validation_error(info, schema)
+        if schema_err:
+            findings.append((BLOCKER, "schema", schema_err))
 
     # --- author-requested de-list (machine signal / proof-of-control) --------
     delisted = bool(info.get("delist"))
@@ -123,23 +130,13 @@ def scan_plugin(entry, target, plugins_dir, token):
         data, merr = lib.gh_get_repo(owner, repo, token)
         if data:
             meta = data
-            if data.get("archived"):
-                findings.append((BEST_PRACTICE, "archived", "source repo is archived"))
-            bug = lib.parse_github_repo(info.get("bugURL", "") or "")
-            # An archived repo is read-only regardless of what has_issues says, so
-            # archiving always implies issues-disabled even if the flag wasn't flipped.
-            if data.get("has_issues") is False or data.get("archived"):
-                findings.append((BLOCKER, "issues-disabled",
-                                 "GitHub Issues are disabled — users can't report bugs and we "
-                                 "can't reach you there"))
-            elif not bug:
-                findings.append((OPTIONAL, "bugurl", "no bugURL set (Report-a-Bug link)"))
+            findings.extend(lib.repo_metadata_findings(meta, info.get("bugURL", "")))
 
     # --- static compliance lint (needs a clone) -----------------------------
     linted = False
     if plugin_dir:
         linted = True
-        for f in lint_plugin_dir(plugin_dir, name):
+        for f in lint_plugin_dir(plugin_dir, name, info=info):
             findings.append((f.severity, f.code, f.message))
 
     # --- status --------------------------------------------------------------
@@ -244,11 +241,16 @@ def main():
     ap.add_argument("--target-major", type=int, required=True)
     ap.add_argument("--plugin-list", default="pluginList.json")
     ap.add_argument("--plugins-dir", default=None, help="dir of cloned plugins (named by repoName)")
+    ap.add_argument("--schema", default=None, help="pluginInfo.schema.json (omit to skip schema validation)")
     ap.add_argument("--out", default="out")
     ap.add_argument("--limit", type=int, default=0, help="scan only first N (testing)")
     args = ap.parse_args()
 
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    schema = None
+    if args.schema:
+        with open(args.schema, encoding="utf-8") as f:
+            schema = json.load(f)
     entries = lib.load_pluginlist(args.plugin_list)
     if args.limit:
         entries = entries[: args.limit]
@@ -256,7 +258,7 @@ def main():
     os.makedirs(os.path.join(args.out, "issues"), exist_ok=True)
     results = []
     for entry in entries:
-        r = scan_plugin(entry, args.target_major, args.plugins_dir, token)
+        r = scan_plugin(entry, args.target_major, args.plugins_dir, token, schema)
         results.append(r)
         with open(os.path.join(args.out, "issues", f"{r['name']}.md"), "w", encoding="utf-8") as f:
             f.write(issue_body(r, args.target_major))

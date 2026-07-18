@@ -33,6 +33,8 @@ jobs:
         with:
           python-version: "3.x"
 
+      - run: pip install jsonschema
+
       - name: Recheck stuck de-list requests
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

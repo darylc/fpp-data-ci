@@ -13,20 +13,24 @@
 # the short names in pluginCategories.json (which stays the single source of truth).
 # A CI check (validate-pluginlist) asserts these two lists still match so they can't drift.
 
-name: Submit a plugin
-description: Add your plugin to FPP's Plugin Manager list (pluginList.json).
+name: "⚠️ Submit a plugin (manual — do not use, see guided link below)"
+description: Do not open this directly — use the guided submission page instead (link at the bottom of the New Issue chooser).
 title: "[Plugin] <your-repoName>"
 labels: ["plugin", "submission"]
 body:
   - type: markdown
     attributes:
       value: |
-        ## 🛑 Are these fields empty? Don't fill them in by hand.
+        ## 🛑 STOP — do not fill this form in by hand.
 
-        Start at the **[guided submission page](https://darylc.github.io/fpp-data-ci/contact/)**.
-        It fills this form in for you and encrypts your contact email so it never appears
-        publicly. Submitting this form by hand means we have no way to contact you, and it
-        will be sent back.
+        Go back to the **New issue** chooser and click
+        **⚡ Submit a plugin — start here (guided)** instead.
+
+        That page fills in every field below for you and encrypts your contact email so
+        it never appears publicly. Submitting this form by hand means we have no way to
+        contact you, and it **will be sent back** unfilled.
+
+        Direct link: **[guided submission page](https://darylc.github.io/fpp-data-ci/contact/)**.
 
         If the fields below are **already filled in**, you came from the guided page —
         carry on, tick the acknowledgements at the bottom, and submit. 👍

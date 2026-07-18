@@ -125,3 +125,11 @@ Plugins from the `FalconChristmas` GitHub org show an **Official** badge; everyo
 behind a third-party confirmation. The list is periodically re-validated; entries whose repos
 disappear or fall out of FPP-version compatibility may be flagged. The FPP developers reserve the
 right to remove any plugin at any time.
+
+## Removing your plugin
+
+No longer maintaining it, or don't want it listed anymore? Open a
+[**Request Plugin Removal**](../../issues/new?template=submit_remove_plugin.yml) issue — or start at
+the [guided page](https://darylc.github.io/fpp-data-ci/submit_remove_plugin/), which fills in the
+repoName for you (no email involved here, so it's a single step, unlike submitting). Existing
+installs are unaffected; the entry is just removed from `pluginList.json`.

@@ -108,7 +108,21 @@ function go() {
   const repoName = $("repo_name").value.trim();
   if (!repoName) return setMsg(msg, "Please enter your plugin's repoName or repo URL.", "err");
 
-  const qs = new URLSearchParams({ template: TEMPLATE, repoName });
+  // Title should show the bare repoName even if a full URL was pasted (same
+  // extraction remove-plugin-verify.yml does server-side) — "[Remove plugin
+  // request] https://github.com/owner/repo" would look wrong in the issue list.
+  let titleName = repoName;
+  if (repoName.includes("github.com") || repoName.includes("githubusercontent.com")) {
+    try {
+      const u = new URL(repoName.includes("://") ? repoName : `https://${repoName}`);
+      const parts = u.pathname.split("/").filter(Boolean);
+      if (parts.length >= 2) titleName = parts[1].replace(/\.git$/, "");
+    } catch (e) { /* not a real URL -- use as typed */ }
+  }
+
+  const qs = new URLSearchParams({
+    template: TEMPLATE, title: `[Remove plugin request] ${titleName}`, repoName,
+  });
   window.location.href = `https://github.com/${REPO}/issues/new?${qs}`;
 }
 $("go").addEventListener("click", go);

@@ -25,6 +25,15 @@ body:
 
   
   - type: input
+    id: repo_url
+    attributes:
+      label: GitHub repo
+      description: The repo's own GitHub page (not the pluginInfo.json URL below).
+      placeholder: https://github.com/you/fpp-AnnouncementAssistant
+    validations:
+      required: true
+
+  - type: input
     id: display_name
     attributes:
       label: Plugin display name

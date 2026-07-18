@@ -110,9 +110,6 @@ jobs:
                 msg.push(`- ${badge[f.severity] || ''} **${label[f.severity] || f.severity} — ${f.code}** — ${f.message}`);
               }
               msg.push('',
-                       '*New submissions are held to a stricter bar than already-listed plugins: ' +
-                       '`best-practice` findings block here too, not just `blocker`.*',
-                       '',
                        'Push a fix to your repo, then comment `/recheck` here (no need to edit this issue) to re-run the scan.');
             }
             const optional = findings.filter(f => f.severity === 'optional');

@@ -188,6 +188,9 @@ async function deriveFromRepo() {
   }
   const [, owner, repo] = m;
   $("repo_name").value = repo;   // fallback so the contact token can still bind to a repo below
+  // Normalize to a full URL (not "owner/repo" shorthand) so it renders as a clickable
+  // link once it lands in the issue body — GitHub auto-links bare URLs, not shorthand.
+  $("repo_url").value = `https://github.com/${owner}/${repo}`;
 
   setMsg(fetchMsg, "Looking up repo…", "");
   try {
@@ -221,11 +224,13 @@ function b64(bytes) {
 }
 const wrap = (s) => s.replace(/(.{72})/g, "$1\n").trim();
 
-// Fields that go straight onto the public issue, mapped to the form's field ids. Only
-// repo_url and email are actually asked for on THIS page (see deriveFromRepo) — these
-// four are best-effort auto-fill, sent along whether they came out empty or not, and
-// confirmed/corrected by the submitter on GitHub's own form instead of here.
-const PUBLIC_FIELDS = ["display_name", "repo_name", "plugininfo_url", "description"];
+// Fields that go straight onto the public issue, mapped to the form's field ids.
+// repo_url and email are the only two actually asked for on THIS page — repo_url is
+// itself one of PUBLIC_FIELDS (normalized to a full URL above so it links cleanly),
+// while the other three are best-effort auto-fill, sent along whether they came out
+// empty or not, and confirmed/corrected by the submitter on GitHub's own form instead
+// of here.
+const PUBLIC_FIELDS = ["repo_url", "display_name", "repo_name", "plugininfo_url", "description"];
 
 async function generate() {
   const msg = $("msg");

@@ -1,6 +1,6 @@
 # Guards the submission issue queue.
 #
-# WHY: the guided page (docs/contact/) is the only supported way to submit — it encrypts the
+# WHY: the guided page (docs/submit_new_plugin/) is the only supported way to submit — it encrypts the
 # author's email before it ever reaches this public repo. But the underlying Issue Form is
 # always reachable directly (GitHub has no way to hide a template), so people will land on it
 # and fill it in by hand. This check catches that and points them at the guided page.
@@ -34,7 +34,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const GUIDE = 'https://darylc.github.io/fpp-data-ci/contact/';
+            const GUIDE = 'https://darylc.github.io/fpp-data-ci/submit_new_plugin/';
             const MARKER = '<!-- submission-token-check -->';
             const body = context.payload.issue.body || '';
 

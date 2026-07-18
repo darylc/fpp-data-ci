@@ -21,7 +21,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        ## 🛑 You should only arrive here via https://darylc.github.io/fpp-data-ci/contact/ which will pre-fill this form for you.
+        ## 🛑 You should only arrive here via https://darylc.github.io/fpp-data-ci/submit_new_plugin/ which will pre-fill this form for you.
 
   
   - type: input
@@ -93,7 +93,7 @@ body:
   # here: this issue is PUBLIC the instant it's submitted (notifications, API, edit
   # history), so a plaintext address would leak immediately and redaction is too late.
   # The token is encrypted in the submitter's browser; only FPP's private contacts repo
-  # holds the key. See docs/contact/index.html.
+  # holds the key. See docs/submit_new_plugin/index.html.
   #
   # SANDBOX URL BELOW — swap to https://falconchristmas.github.io/fpp-data/contact/
   # when promoting upstream.
@@ -103,7 +103,7 @@ body:
       label: Contact token (encrypted email)
       description: >
         Filled in by the
-        **[guided page](https://darylc.github.io/fpp-data-ci/contact/)** — leave it alone.
+        **[guided page](https://darylc.github.io/fpp-data-ci/submit_new_plugin/)** — leave it alone.
 
 
         ⚠️ **Never type your email address here.** This issue is public the instant you submit

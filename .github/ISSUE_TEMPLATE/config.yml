@@ -14,5 +14,5 @@ contact_links:
   # dropped from this chooser (2026-07-18) — they clutter the "New issue" screen and
   # are already linked from within the plugin-submission.yml form body.
   - name: ⚡ Submit a plugin — start here (guided)
-    url: https://darylc.github.io/fpp-data-ci/contact/
+    url: https://darylc.github.io/fpp-data-ci/submit_new_plugin/
     about: Recommended. Fills in the submission form for you and encrypts your contact email.

@@ -14,7 +14,7 @@ must keep a copy:
      `name` in pluginCategories.json by longName. This is a hand-kept copy: add a
      category upstream and the form silently offers a stale list forever.
 
-  2. docs/contact/index.html — CATEGORIES_FALLBACK. The page fetches the real list at
+  2. docs/submit_new_plugin/index.html — CATEGORIES_FALLBACK. The page fetches the real list at
      runtime, so this only shows if the fetch fails (offline/rate-limited). Lower stakes,
      but it should still not rot.
 
@@ -23,7 +23,7 @@ Nothing warns you when these drift — hence this check. Exits non-zero on misma
 Usage:
   check_category_drift.py --categories pluginCategories.json \
       --form .github/ISSUE_TEMPLATE/plugin-submission.yml \
-      --page docs/contact/index.html
+      --page docs/submit_new_plugin/index.html
 """
 import argparse
 import json

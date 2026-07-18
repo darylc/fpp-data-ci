@@ -16,7 +16,7 @@ format, and what CI checks automatically. Two ways in:
 
 1. **[Submit a plugin](../../issues/new?template=plugin-submission.yml)**
    (Issue Form, no git needed) — start at the
-   [guided submission page](https://darylc.github.io/fpp-data-ci/contact/).
+   [guided submission page](https://darylc.github.io/fpp-data-ci/submit_new_plugin/).
 2. **Pull Request** — add your entry to `pluginList.json` directly; a CI
    check validates it and comments on the PR.
 

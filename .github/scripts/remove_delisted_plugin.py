@@ -42,9 +42,11 @@ def remove_entry(text: str, repo_name: str) -> tuple[str | None, str | None]:
     if not entry_idx:
         return None, "no plugin entries found in pluginList.json"
 
+    # Case-insensitive: see resolve_owner()'s docstring in verify_delist.py --
+    # a plugin's declared repoName doesn't always match its repo's URL casing.
     target = None
     for i in entry_idx:
-        if ENTRY_RE.match(lines[i]).group(2) == repo_name:
+        if ENTRY_RE.match(lines[i]).group(2).lower() == repo_name.lower():
             target = i
             break
     if target is None:

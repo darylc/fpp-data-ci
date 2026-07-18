@@ -39,9 +39,16 @@ def field(body: str, label: str) -> str:
 
 
 def resolve_owner(repo_name: str, plugin_list_path: str, token):
-    """(owner, repo, archived_or_missing, delist_flag, error) for a listed plugin."""
+    """(owner, repo, archived_or_missing, delist_flag, error) for a listed plugin.
+
+    Matches case-insensitively: GitHub repo names are case-insensitive in URLs,
+    but a plugin's declared repoName (what pluginList.json stores) doesn't
+    always match its repo's URL casing byte-for-byte (e.g. "fpp-PulseMesh" vs.
+    the repo slug "fpp-pulsemesh") -- an exact match would wrongly report a
+    listed plugin as not found.
+    """
     for entry in lib.load_pluginlist(plugin_list_path):
-        if entry and entry[0] == repo_name:
+        if entry and entry[0].lower() == repo_name.lower():
             info_url = entry[1] if len(entry) > 1 else ""
             info, err = lib.fetch_json(info_url)
             if err:
@@ -74,9 +81,22 @@ def main():
     body = os.environ.get("ISSUE_BODY") or ""
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     repo_name = lib.resolve_repo_name(field(body, "Plugin repoName") or field(body, "repoName"))
+    # Third-party reports (submitter isn't the author) can never prove ownership,
+    # so they skip straight to human review instead of being asked for delist:true
+    # proof-of-control they have no way to provide.
+    is_third_party = field(body, "Are you the plugin's author/maintainer?").strip().lower().startswith("no")
 
     if not repo_name:
         verdict, msg = "error", "Could not read a **Plugin repoName** from the form."
+    elif is_third_party:
+        owner, repo, gone, delist, err = resolve_owner(repo_name, args.plugin_list, token)
+        if err:
+            verdict, msg = "error", f"Could not resolve `{repo_name}` for this report: {err}"
+        else:
+            verdict, msg = "report", (
+                f"📋 Third-party report received for `{owner}/{repo}` — thanks for flagging it. "
+                f"This is **not** applied automatically (only the plugin's own owner can trigger "
+                f"that); a maintainer will look into whether it should be de-listed.")
     else:
         owner, repo, gone, delist, err = resolve_owner(repo_name, args.plugin_list, token)
         if err:
@@ -105,6 +125,7 @@ def main():
     if out:
         with open(out, "a", encoding="utf-8") as f:
             f.write(f"verdict={verdict}\n")
+            f.write(f"repo_name={repo_name}\n")
     print(f"{verdict}: {msg}")
 
 

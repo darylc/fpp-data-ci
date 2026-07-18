@@ -28,7 +28,7 @@ import os
 from datetime import datetime, timezone
 
 import lib_plugin_schema as lib
-from lint_plugin import lint_plugin_dir, ERROR, WARN, INFO
+from lint_plugin import lint_plugin_dir, BLOCKER, BEST_PRACTICE, OPTIONAL
 
 GUIDELINES = "https://github.com/FalconChristmas/fpp-plugin-Template/blob/master/PLUGIN_GUIDELINES.md"
 FORMAT_DOC = "https://github.com/FalconChristmas/fpp-plugin-Template/blob/master/PLUGININFO_FORMAT.md"
@@ -102,12 +102,12 @@ def scan_plugin(entry, target, plugins_dir, token):
     info = info or {}
     findings = []          # (severity, code, message)
     if err:
-        findings.append((WARN, "plugininfo", err))
+        findings.append((BLOCKER, "plugininfo", err))
 
     # --- author-requested de-list (machine signal / proof-of-control) --------
     delisted = bool(info.get("delist"))
     if delisted:
-        findings.append((INFO, "delist",
+        findings.append((OPTIONAL, "delist",
                          "author set \"delist\": true in pluginInfo.json — de-list requested"))
 
     # --- version compatibility (the primary campaign signal) ----------------
@@ -124,14 +124,16 @@ def scan_plugin(entry, target, plugins_dir, token):
         if data:
             meta = data
             if data.get("archived"):
-                findings.append((WARN, "archived", "source repo is archived"))
+                findings.append((BEST_PRACTICE, "archived", "source repo is archived"))
             bug = lib.parse_github_repo(info.get("bugURL", "") or "")
-            if data.get("has_issues") is False:
-                findings.append((WARN, "issues-disabled",
+            # An archived repo is read-only regardless of what has_issues says, so
+            # archiving always implies issues-disabled even if the flag wasn't flipped.
+            if data.get("has_issues") is False or data.get("archived"):
+                findings.append((BLOCKER, "issues-disabled",
                                  "GitHub Issues are disabled — users can't report bugs and we "
                                  "can't reach you there"))
             elif not bug:
-                findings.append((INFO, "bugurl", "no bugURL set (Report-a-Bug link)"))
+                findings.append((OPTIONAL, "bugurl", "no bugURL set (Report-a-Bug link)"))
 
     # --- static compliance lint (needs a clone) -----------------------------
     linted = False
@@ -162,9 +164,9 @@ def scan_plugin(entry, target, plugins_dir, token):
         "months_since_push": stale,
         "linted": linted,
         "findings": findings,
-        "num_errors": sum(1 for s, _, _ in findings if s == ERROR),
-        "num_warn": sum(1 for s, _, _ in findings if s == WARN),
-        "num_info": sum(1 for s, _, _ in findings if s == INFO),
+        "num_blocker": sum(1 for s, _, _ in findings if s == BLOCKER),
+        "num_best_practice": sum(1 for s, _, _ in findings if s == BEST_PRACTICE),
+        "num_optional": sum(1 for s, _, _ in findings if s == OPTIONAL),
     }
 
 
@@ -204,10 +206,11 @@ def issue_body(r, target):
     # findings
     if r["findings"]:
         L.append("### Areas of concern / optimisation")
-        order = {ERROR: 0, WARN: 1, INFO: 2}
-        badge = {ERROR: "🛑", WARN: "⚠️", INFO: "💡"}
+        order = {BLOCKER: 0, BEST_PRACTICE: 1, OPTIONAL: 2}
+        badge = {BLOCKER: "🛑", BEST_PRACTICE: "⚠️", OPTIONAL: "💡"}
+        label = {BLOCKER: "Blocker", BEST_PRACTICE: "Best practice", OPTIONAL: "Optional"}
         for sev, code, msg in sorted(r["findings"], key=lambda f: order.get(f[0], 3)):
-            L.append(f"- {badge.get(sev, '')} **{code}** — {msg}")
+            L.append(f"- {badge.get(sev, '')} **{label.get(sev, sev)} — {code}** — {msg}")
         L.append("")
     L.append(f"Please review the [Plugin Guidelines]({GUIDELINES}) and "
              f"[pluginInfo.json format]({FORMAT_DOC}).")
@@ -225,14 +228,14 @@ def build_dashboard(results, target):
          f"{total} plugins · ✅ {by('compatible')} compatible · "
          f"🔧 {by('needs-update')} need update · 💤 {by('unmaintained')} unmaintained",
          "",
-         "| Plugin | Status | FPP-compat | Issues | Last push | 🛑 | ⚠️ | 💡 |",
+         "| Plugin | Status | FPP-compat | Issues | Last push | 🛑 Blocker | ⚠️ Best practice | 💡 Optional |",
          "|---|---|---|---|---|--:|--:|--:|"]
     for r in sorted(results, key=lambda r: (r["status"] != "needs-update", r["name"].lower())):
         issues = {True: "on", False: "**off**", None: "?"}[r["issues_enabled"]]
         push = f"{r['months_since_push']}mo" if r["months_since_push"] is not None else "?"
         L.append(f"| {r['name']} | {ICON.get(r['status'], '')} {r['status']} | "
                  f"{'yes' if r['certified'] else 'no'} | {issues} | {push} | "
-                 f"{r['num_errors'] or ''} | {r['num_warn'] or ''} | {r['num_info'] or ''} |")
+                 f"{r['num_blocker'] or ''} | {r['num_best_practice'] or ''} | {r['num_optional'] or ''} |")
     return "\n".join(L)
 
 
@@ -258,7 +261,7 @@ def main():
         with open(os.path.join(args.out, "issues", f"{r['name']}.md"), "w", encoding="utf-8") as f:
             f.write(issue_body(r, args.target_major))
         print(f"{ICON.get(r['status'],'')} {r['name']:34} {r['status']:13} "
-              f"E{r['num_errors']} W{r['num_warn']} I{r['num_info']}"
+              f"B{r['num_blocker']} P{r['num_best_practice']} O{r['num_optional']}"
               f"{'' if r['linted'] else '  (no clone — metadata only)'}")
 
     with open(os.path.join(args.out, "dashboard.md"), "w", encoding="utf-8") as f:

@@ -184,10 +184,7 @@ def issue_body(r, target, draft=True):
     L.append(f"<!-- plugin:{r['name']} campaign:fpp{target} -->")
     if draft:
         L.append(f"> **DRY RUN — draft only. The maintainer has NOT been notified.**")
-    else:
-        L.append(f"> Comment `/recheck` after pushing a fix to re-run this check, or `/submit` if "
-                  f"you believe a finding doesn't apply and want a maintainer to look regardless.")
-    L.append("")
+        L.append("")
     L.append(f"## {r['name']} — FPP {target} readiness")
     if r["owner"]:
         mention = "not @-mentioned in this dry run" if draft else "not @-mentioned — see MENTION_OWNER"
@@ -234,6 +231,9 @@ def issue_body(r, target, draft=True):
              f"({REMOVAL_GUIDED_PAGE}) (fills in the repoName for you), or open a "
              f"[Request Plugin Removal]({REMOVAL_FORM}) issue directly — we'll remove it from the "
              f"list, no update needed.")
+    if not draft:
+        L.append("")
+        L.append("**Comment `/recheck` after pushing a fix to re-run this check.**")
     return "\n".join(L)
 
 

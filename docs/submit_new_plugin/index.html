@@ -40,13 +40,6 @@
   code { background:var(--code); padding:.1rem .3rem; border-radius:4px; font-size:.85em; }
   details { margin-top:1rem; font-size:.85rem; color:var(--muted); }
   summary { cursor:pointer; }
-  /* #confirmDetails holds real form fields (not a muted footnote like the other
-     <details> blocks), so give it back normal size/color and a border to read as
-     part of the form rather than supplementary text. */
-  #confirmDetails { font-size:1rem; color:var(--fg); border:1px solid var(--line);
-                     border-radius:6px; padding:.6rem .8rem; }
-  #confirmDetails summary { font-weight:600; font-size:.9rem; }
-  #confirmDetails label:first-of-type { margin-top:.2rem; }
   /* The logo asset ships white (built for FPP's dark header). The inlined copy below
      uses currentColor instead, so it stays visible in light mode too. */
   header { display:flex; align-items:center; gap:.85rem; margin-bottom:1.4rem; }
@@ -81,34 +74,9 @@
   <fieldset>
     <legend>Your plugin</legend>
 
-    <label for="repo_url">Your plugin's GitHub repo
-      <span class="hint">— we'll read display name, description and repoName from its pluginInfo.json</span></label>
+    <label for="repo_url">Your plugin's GitHub repo</label>
     <input id="repo_url" type="text" autocomplete="off" spellcheck="false" placeholder="github.com/you/fpp-AnnouncementAssistant">
     <div id="fetchMsg" class="msg hint"></div>
-
-    <label for="category">Category</label>
-    <select id="category"></select>
-
-    <details id="confirmDetails">
-      <summary id="confirmSummary">Plugin details — filled in automatically once we can read your repo</summary>
-      <div style="padding-top:.6rem">
-        <label for="display_name">Plugin display name
-          <span class="hint">— shown in the Plugin Manager; edit if pluginInfo.json got it wrong</span></label>
-        <input id="display_name" type="text" autocomplete="off" placeholder="Announcement Assistant">
-
-        <label for="repo_name">repoName
-          <span class="hint">— must match the <code>repoName</code> in your pluginInfo.json</span></label>
-        <input id="repo_name" type="text" autocomplete="off" spellcheck="false" placeholder="fpp-AnnouncementAssistant">
-
-        <label for="plugininfo_url">pluginInfo.json raw URL</label>
-        <input id="plugininfo_url" type="url" autocomplete="off" spellcheck="false"
-               placeholder="https://raw.githubusercontent.com/you/repo/refs/heads/main/pluginInfo.json">
-
-        <label for="description">One-line description</label>
-        <input id="description" type="text" autocomplete="off"
-               placeholder="Play pre-canned announcements over the show audio.">
-      </div>
-    </details>
 
     <label for="email">Contact email
       <span class="hint">— encrypted here; visible only to FPP maintainers</span></label>
@@ -116,13 +84,26 @@
 
     <button id="go">Encrypt &amp; continue</button>
     <div id="msg" class="msg"></div>
+
+    <!-- Hidden, not asked here: category can't be carried over at all (GitHub Issue
+         Forms cannot prefill dropdown fields, full stop — see generate() below), and
+         display_name/repo_name/plugininfo_url/description are auto-read from your
+         repo's pluginInfo.json when possible. Whatever isn't known lands blank on the
+         next page and you fill it in there — that page's own inputs are the one place
+         all of this can reliably be reviewed and corrected. -->
+    <input id="display_name" type="hidden">
+    <input id="repo_name" type="hidden">
+    <input id="plugininfo_url" type="hidden">
+    <input id="description" type="hidden">
   </fieldset>
 
   <fieldset id="step2">
     <legend>Almost done</legend>
     <p style="margin:.2rem 0 0">
-      Your details are ready. The button below opens a GitHub issue with everything
-      <strong>already filled in</strong> — tick the acknowledgements there and submit.
+      Your contact info is encrypted and ready. The button below opens a GitHub issue —
+      <strong>pick a Category</strong> there (that field can only be filled in on GitHub
+      itself) and double-check anything we read from your <code>pluginInfo.json</code>,
+      then tick the acknowledgements and submit.
     </p>
     <a id="continue" class="btn" href="#" rel="noopener">Continue on GitHub →</a>
     <div class="msg hint" id="fallbackMsg"></div>
@@ -176,88 +157,36 @@ const PUBLIC_JWK = {
   ]
 };
 
-// Categories are fetched live from pluginCategories.json — the single source of truth —
-// so adding a category upstream needs no change here. raw.githubusercontent.com sends
-// permissive CORS headers, so the browser fetch is allowed.
-const CATEGORIES_URL =
-  "https://raw.githubusercontent.com/FalconChristmas/fpp-data/master/pluginCategories.json";
-
-// Fallback only — used if the fetch fails (offline/rate-limited). Kept in sync by a CI
-// drift check. The Issue Form's dropdown CANNOT do this (static YAML, no JS), so that
-// list stays a hand-kept copy and the drift check is what stops all three diverging.
-// [shortName, longName] — short is the VALUE that goes into pluginList.json; long is
-// only what the human reads.
-const CATEGORIES_FALLBACK = [
-  ["Audio", "Audio, Music & FM/RDS"],
-  ["Interaction", "Viewer Interaction & Show Requests"],
-  ["Payments", "Payments & Donations"],
-  ["Messaging", "Messaging, Signage & Countdown"],
-  ["Data Feeds", "Data Feeds & Information"],
-  ["Home Automation", "Home Automation & Integrations"],
-  ["Notifications", "Notifications & Communication"],
-  ["Hardware", "Hardware, Controls & Animatronics"],
-  ["Display & Video", "Display, Video & Capture"],
-  ["Monitoring", "Monitoring & System Tools"],
-];
+// Category is deliberately NOT handled on this page at all: GitHub Issue Forms cannot
+// prefill a `dropdown`-type field via query parameters under any circumstances (only
+// input/textarea fields support that) — confirmed platform limitation, not something a
+// value-matching fix can work around. The submitter picks Category on the real GitHub
+// form instead, where its dropdown works normally.
 // ---------------------------------------------------------------------------
 
 const PREFIX = "FPPC1:";
 const $ = (id) => document.getElementById(id);
 const setMsg = (el, text, cls) => { el.textContent = text; el.className = "msg" + (cls ? " " + cls : ""); };
 
-const sel = $("category");
-
-// list = [[shortName, longName], …]. The option's VALUE must be the longName, not the
-// shortName: the Issue Form's category dropdown (plugin-submission.yml) can only show
-// longName strings — a static YAML dropdown has no separate label/value, so its options
-// ARE longName — and GitHub's issue prefill only pre-selects a dropdown option when the
-// query-param value matches one of its option strings EXACTLY. Sending shortName here
-// silently fails to match, leaving Category unselected on the prefilled issue. Whoever
-// transcribes an accepted submission into pluginList.json maps longName back to
-// shortName via pluginCategories.json (see check_category_drift.py).
-function fillCategories(list) {
-  sel.replaceChildren();
-  sel.append(new Option("— choose —", ""));
-  for (const [short, long] of list) sel.append(new Option(long || short, long || short));
-}
-
-// Show the fallback immediately so the form is usable even before/without the fetch.
-fillCategories(CATEGORIES_FALLBACK);
-
-(async () => {
-  try {
-    const res = await fetch(CATEGORIES_URL, { cache: "no-store" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    // Tolerate either a bare array or a wrapper object, and either field name.
-    const arr = Array.isArray(data) ? data
-              : (data.categories || data.pluginCategories || []);
-    const pairs = arr
-      .map(c => (typeof c === "string"
-                   ? [c, c]
-                   : [c.name || c.shortName, c.longName || c.name || c.shortName]))
-      .filter(([short]) => short);
-    if (pairs.length) fillCategories(pairs);
-  } catch (e) {
-    // Non-fatal: the fallback list is already in the dropdown.
-    console.warn("category fetch failed, using built-in list:", e.message);
-  }
-})();
-
-// Auto-fill display_name/repo_name/plugininfo_url/description from the repo's own
-// pluginInfo.json, so the submitter mostly just confirms rather than retypes what
-// their repo already says. Fields stay editable — pluginInfo.json can be missing,
-// stale, or just wrong, and the maintainer-facing repo_name/plugininfo_url especially
-// need to survive that gracefully rather than silently submitting garbage.
+// Best-effort auto-fill of display_name/repo_name/plugininfo_url/description from the
+// repo's own pluginInfo.json, so the submitter mostly doesn't have to retype what their
+// repo already says. These fields are hidden on THIS page (not shown for review here) —
+// they still land on the next page's normal, editable inputs, so anything missing or
+// wrong (no pluginInfo.json yet, private repo, wrong branch, ...) just arrives blank
+// there and gets filled in / corrected on GitHub directly, same as Category.
 async function deriveFromRepo() {
   const fetchMsg = $("fetchMsg");
   const raw = $("repo_url").value.trim();
-  if (!raw) return;
+  if (!raw) return null;
 
   const m = raw.match(/^(?:https?:\/\/)?(?:www\.)?github\.com\/([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?\/?$/)
          || raw.match(/^([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?$/);
-  if (!m) return setMsg(fetchMsg, "Enter your repo as owner/repo or a full github.com URL.", "err");
+  if (!m) {
+    setMsg(fetchMsg, "Enter your repo as owner/repo or a full github.com URL.", "err");
+    return null;
+  }
   const [, owner, repo] = m;
+  $("repo_name").value = repo;   // fallback so the contact token can still bind to a repo below
 
   setMsg(fetchMsg, "Looking up repo…", "");
   try {
@@ -276,17 +205,11 @@ async function deriveFromRepo() {
     if (info.description) $("description").value = info.description;
     $("repo_name").value = info.repoName || repo;
 
-    // Collapse the confirmation block — the submitter can still expand it to check/edit,
-    // but the happy path shouldn't force them to look at four fields they didn't type.
-    $("confirmDetails").open = false;
-    $("confirmSummary").textContent = `✓ ${info.name || repo} (${info.repoName || repo}) — click to edit`;
-    setMsg(fetchMsg, "Loaded from pluginInfo.json.", "ok");
+    setMsg(fetchMsg, "Read pluginInfo.json — you'll confirm the details on the next page.", "ok");
   } catch (e) {
-    // Couldn't auto-fill — force the block open so there's somewhere to type it by hand.
-    $("confirmDetails").open = true;
-    $("confirmSummary").textContent = "Plugin details";
-    setMsg(fetchMsg, `Couldn't auto-fill (${e.message}). Fill in the fields below by hand.`, "err");
+    setMsg(fetchMsg, `Couldn't read pluginInfo.json (${e.message}). You'll fill those fields in on the next page.`, "");
   }
+  return repo;
 }
 $("repo_url").addEventListener("blur", deriveFromRepo);
 
@@ -297,25 +220,28 @@ function b64(bytes) {
 }
 const wrap = (s) => s.replace(/(.{72})/g, "$1\n").trim();
 
-// Fields that go straight onto the public issue, mapped to the form's field ids.
-const PUBLIC_FIELDS = ["display_name", "repo_name", "plugininfo_url", "category", "description"];
+// Fields that go straight onto the public issue, mapped to the form's field ids. Only
+// repo_url and email are actually asked for on THIS page (see deriveFromRepo) — these
+// four are best-effort auto-fill, sent along whether they came out empty or not, and
+// confirmed/corrected by the submitter on GitHub's own form instead of here.
+const PUBLIC_FIELDS = ["display_name", "repo_name", "plugininfo_url", "description"];
 
 async function generate() {
   const msg = $("msg");
-  const v = Object.fromEntries(PUBLIC_FIELDS.map(f => [f, $(f).value.trim()]));
   const email = $("email").value.trim();
 
-  for (const [id, label] of [["display_name","display name"], ["repo_name","repoName"],
-                             ["plugininfo_url","pluginInfo.json URL"], ["category","category"],
-                             ["description","description"]]) {
-    if (!v[id]) return setMsg(msg, `Please fill in the ${label}.`, "err");
-  }
-  if (!/^[A-Za-z0-9._-]+$/.test(v.repo_name))
-    return setMsg(msg, "repoName should be just the repo name, not a URL.", "err");
-  if (!/^https?:\/\//.test(v.plugininfo_url))
-    return setMsg(msg, "The pluginInfo.json URL must start with http(s)://", "err");
+  if (!$("repo_url").value.trim()) return setMsg(msg, "Please enter your plugin's GitHub repo.", "err");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     return setMsg(msg, "That doesn't look like an email address.", "err");
+
+  // Make sure repo_name/plugininfo_url/etc. reflect the CURRENT repo_url even if the
+  // field never lost focus (e.g. paste-then-click) rather than relying solely on blur.
+  setMsg(msg, "Reading pluginInfo.json…", "");
+  await deriveFromRepo();
+
+  const v = Object.fromEntries(PUBLIC_FIELDS.map(f => [f, $(f).value.trim()]));
+  if (!/^[A-Za-z0-9._-]+$/.test(v.repo_name))
+    return setMsg(msg, "Couldn't work out a repoName from that repo — check the URL and try again.", "err");
 
   setMsg(msg, "Encrypting…", "");
   try {
@@ -334,7 +260,7 @@ async function generate() {
     // a special top-level param (not a field id) that overrides the template's default
     // "do not edit this title" placeholder with the actual plugin name.
     const qs = new URLSearchParams({
-      template: TEMPLATE, title: `[Plugin] ${v.display_name}`, ...v, contact_token: token,
+      template: TEMPLATE, title: `[Plugin] ${v.display_name || v.repo_name}`, ...v, contact_token: token,
     });
     const url = `https://github.com/${REPO}/issues/new?${qs}`;
 

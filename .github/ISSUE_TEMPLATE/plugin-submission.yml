@@ -73,6 +73,7 @@ body:
         - Hardware, Controls & Animatronics
         - Display, Video & Capture
         - Monitoring & System Tools
+        - Other
     validations:
       required: true
 
@@ -124,7 +125,7 @@ body:
       description: >
         These mirror the Contribution Guidelines. All are required — please confirm each.
       options:
-        - label: I tested this plugin on the latest released version of FPP **and** the current nightly build.
+        - label: This plugin is production release quality and I have tested it on both the latest released version of FPP **and** the current nightly build.
           required: true
         - label: My plugin does not interfere with core FPP functionality, stability, or real-time sequence playback, and installs cleanly (or refuses with an explanation) on hardware it can't support.
           required: true

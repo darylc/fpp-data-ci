@@ -1,49 +1,38 @@
 #!/usr/bin/env python3
-"""Assert the hand-kept category copies still match pluginCategories.json.
+"""Assert the Issue Form's category dropdown still matches pluginCategories.json.
 
 WHY THIS EXISTS
 ---------------
-pluginCategories.json is the single source of truth, but two places can't read it and
-must keep a copy:
+pluginCategories.json is the single source of truth, but
+.github/ISSUE_TEMPLATE/plugin-submission.yml can't read it at render time — GitHub
+Issue Forms are static YAML — so its dropdown is a hand-kept copy. Add a category
+upstream and the form silently offers a stale list forever, with no error anywhere.
+This check is what stops that. Exits non-zero on mismatch.
 
-  1. .github/ISSUE_TEMPLATE/plugin-submission.yml — GitHub Issue Forms are static YAML
-     and cannot fetch anything, and a dropdown's options are plain strings with no
-     separate label/value — so it shows longName (there's no way to display the long
-     name but submit the short one, unlike the JS-driven guided page below). Whoever
-     files an accepted submission into pluginList.json must look up the matching short
-     `name` in pluginCategories.json by longName. This is a hand-kept copy: add a
-     category upstream and the form silently offers a stale list forever.
+The dropdown shows longName, not name: a static YAML dropdown has no separate
+label/value, so its options ARE what gets submitted, and GitHub Issue Forms cannot
+prefill a dropdown field via query parameters under any circumstances — so there's no
+"submit shortName, display longName" trick available here like there is for other
+input fields. Whoever transcribes an accepted submission into pluginList.json maps
+longName back to shortName via pluginCategories.json.
 
-  2. docs/submit_new_plugin/index.html — CATEGORIES_FALLBACK. The page fetches the real list at
-     runtime, so this only shows if the fetch fails (offline/rate-limited). Lower stakes,
-     but it should still not rot.
-
-Nothing warns you when these drift — hence this check. Exits non-zero on mismatch.
+(The guided page at docs/submit_new_plugin/ used to keep a second hand copy for its
+own dropdown, but no longer touches categories at all, for the same prefill-limitation
+reason — the submitter picks Category on the real GitHub form instead.)
 
 Usage:
   check_category_drift.py --categories pluginCategories.json \
-      --form .github/ISSUE_TEMPLATE/plugin-submission.yml \
-      --page docs/submit_new_plugin/index.html
+      --form .github/ISSUE_TEMPLATE/plugin-submission.yml
 """
 import argparse
 import json
-import re
 import sys
 
 import yaml
 
 
-def load_source_of_truth(path):
-    data = json.load(open(path))
-    arr = data if isinstance(data, list) else (data.get("categories") or data.get("pluginCategories") or [])
-    names = [c["name"] if isinstance(c, dict) else c for c in arr]
-    if not names:
-        sys.exit(f"FATAL: no categories found in {path}")
-    return names
-
-
 def load_source_of_truth_long(path):
-    """Long names — what the Issue Form dropdown now shows (short name isn't
+    """Long names — what the Issue Form dropdown shows (short name isn't
     representable in a static Issue Forms dropdown, see plugin-submission.yml)."""
     data = json.load(open(path))
     arr = data if isinstance(data, list) else (data.get("categories") or data.get("pluginCategories") or [])
@@ -59,16 +48,6 @@ def load_form_dropdown(path):
         if block.get("id") == "category" and block.get("type") == "dropdown":
             return list(block["attributes"]["options"])
     sys.exit(f"FATAL: no 'category' dropdown found in {path} — did the field id change?")
-
-
-def load_page_fallback(path):
-    """Pull CATEGORIES_FALLBACK out of the page. Entries are [short, long] pairs."""
-    src = open(path).read()
-    m = re.search(r"const\s+CATEGORIES_FALLBACK\s*=\s*\[(.*?)\];", src, re.DOTALL)
-    if not m:
-        sys.exit(f"FATAL: CATEGORIES_FALLBACK not found in {path} — was it renamed?")
-    # Grab the first string of each [short, long] pair.
-    return re.findall(r'\[\s*"([^"]+)"\s*,', m.group(1))
 
 
 def report(label, truth, actual, errors):
@@ -89,27 +68,19 @@ def report(label, truth, actual, errors):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--categories", required=True)
-    ap.add_argument("--form")
-    ap.add_argument("--page")
+    ap.add_argument("--form", required=True)
     args = ap.parse_args()
 
-    truth = load_source_of_truth(args.categories)
     truth_long = load_source_of_truth_long(args.categories)
-    print(f"pluginCategories.json (source of truth): {len(truth)} categories")
-    print(f"  {', '.join(truth)}\n")
+    print(f"pluginCategories.json (source of truth): {len(truth_long)} categories")
+    print(f"  {', '.join(truth_long)}\n")
 
     errors = []
-    if args.form:
-        # The Issue Form dropdown shows long names (static YAML dropdowns can't
-        # separate a display label from a submitted value), so compare against
-        # longName, not name.
-        report("Issue Form dropdown", truth_long, load_form_dropdown(args.form), errors)
-    if args.page:
-        report("Guided page fallback", truth, load_page_fallback(args.page), errors)
+    report("Issue Form dropdown", truth_long, load_form_dropdown(args.form), errors)
 
     if errors:
         print("\nCategory lists have drifted. pluginCategories.json is the source of truth —")
-        print("update the copies to match it (or add the category there first).")
+        print("update the copy to match it (or add the category there first).")
         return 1
     print("\nAll category copies match pluginCategories.json.")
     return 0

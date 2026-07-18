@@ -1,12 +1,13 @@
-# pluginCategories.json is the single source of truth for categories, but two places
-# keep a hand copy that nothing keeps honest:
+# pluginCategories.json is the single source of truth for categories. The Issue Form
+# dropdown (.github/ISSUE_TEMPLATE/plugin-submission.yml) keeps a hand copy, since
+# static YAML Issue Forms can't fetch anything at render time — nothing keeps that copy
+# honest. Add a category upstream and the form silently offers a stale list forever,
+# with no error anywhere. This check is what stops that.
 #
-#   - the Issue Form dropdown (static YAML — Issue Forms cannot fetch anything)
-#   - the guided page's offline fallback list
-#
-# Add a category upstream and those copies silently go stale — the form would offer a
-# list that no longer matches reality, with no error anywhere. This check is what stops
-# that. It runs on any PR touching either the truth or a copy.
+# The guided page (docs/submit_new_plugin/) used to keep its own copy too, but no
+# longer touches categories at all: GitHub Issue Forms cannot prefill a dropdown field
+# via query parameters under any circumstances, so there was nothing useful for that
+# page to carry — the submitter now picks Category directly on the real GitHub form.
 
 name: Check category drift
 
@@ -15,7 +16,6 @@ on:
     paths:
       - "pluginCategories.json"
       - ".github/ISSUE_TEMPLATE/plugin-submission.yml"
-      - "docs/submit_new_plugin/index.html"
       - ".github/scripts/check_category_drift.py"
       - ".github/workflows/check-category-drift.yml"
   workflow_dispatch:
@@ -40,5 +40,4 @@ jobs:
         run: |
           python .github/scripts/check_category_drift.py \
             --categories pluginCategories.json \
-            --form .github/ISSUE_TEMPLATE/plugin-submission.yml \
-            --page docs/submit_new_plugin/index.html
+            --form .github/ISSUE_TEMPLATE/plugin-submission.yml

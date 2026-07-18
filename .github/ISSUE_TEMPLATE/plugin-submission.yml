@@ -13,7 +13,7 @@
 # the short names in pluginCategories.json (which stays the single source of truth).
 # A CI check (validate-pluginlist) asserts these two lists still match so they can't drift.
 
-name: "⚠️ Submit a plugin (manual — do not use, see guided link below)"
+name: "Workflow processor (do not use)"
 description: Do not open this directly — use the guided submission page instead (link at the bottom of the New Issue chooser).
 title: "[Plugin] <your-repoName>"
 labels: ["plugin", "submission"]

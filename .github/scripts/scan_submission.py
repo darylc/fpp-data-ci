@@ -59,6 +59,8 @@ def main():
     ap.add_argument("--plugininfo-url", required=True)
     ap.add_argument("--repo-name", default=None)
     ap.add_argument("--schema", required=True)
+    ap.add_argument("--reporter", default=None, help="GitHub login of the issue's original reporter")
+    ap.add_argument("--issue-number", default=None)
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -90,6 +92,26 @@ def main():
         if meta:
             findings.extend(repo_metadata_findings(meta, (info or {}).get("bugURL", "")))
 
+    # --- ownership: submitter must own the repo, or prove write access ---------
+    # Unlike removal (verify_remove_plugin.py), a submission had NO ownership check
+    # at all until now — anyone could list anyone else's plugin. Mirrors removal's
+    # "delist": true proof-of-control trick: only someone with push access could add
+    # a specific string to their OWN pluginInfo.json. The token is tied to this one
+    # issue (not a permanent flag like "delist") so an old, already-approved
+    # submission's public token can't be replayed as proof for a different request.
+    owner_confirmed = True
+    if gh and args.reporter and gh[0].lower() != args.reporter.lower():
+        expected = f"fpp-{args.issue_number}"
+        got = str((info or {}).get("submissionToken", "")).strip()
+        if got != expected:
+            owner_confirmed = False
+            findings.append((BLOCKER, "owner-unconfirmed",
+                f"submitter @{args.reporter} does not match `{gh[0]}`, this repo's registered owner "
+                f"(from srcURL). Add `\"submissionToken\": \"{expected}\"` to your pluginInfo.json and "
+                f"comment `/recheck` to prove you have write access here — or, if you're submitting on "
+                f"the owner's behalf with their consent, comment `/submit` instead to flag this for a "
+                f"maintainer's judgement rather than auto-verifying."))
+
     # --- clone + static lint --------------------------------------------------
     linted = False
     if gh:
@@ -116,6 +138,7 @@ def main():
         "pass": not blocking,
         "linted": linted,
         "owner": gh[0] if gh else None,   # registered owner from srcURL — may differ from the submitter
+        "owner_confirmed": owner_confirmed,
         "findings": [{"severity": s, "code": c, "message": m} for s, c, m in findings],
         "num_blocking": len(blocking),
         "num_advisory": len(advisory),

@@ -32,9 +32,12 @@ from lint_plugin import lint_plugin_dir, BLOCKER, BEST_PRACTICE, OPTIONAL
 
 GUIDELINES = "https://github.com/FalconChristmas/fpp-plugin-Template/blob/master/PLUGIN_GUIDELINES.md"
 FORMAT_DOC = "https://github.com/FalconChristmas/fpp-plugin-Template/blob/master/PLUGININFO_FORMAT.md"
-# SANDBOX URL — swap to FalconChristmas/fpp-data when promoting upstream (same
-# convention as the guided pages and Issue Form links elsewhere in this repo).
+# SANDBOX URLs — swap to FalconChristmas/fpp-data (and its Pages equivalent) when
+# promoting upstream (same convention as the guided pages and Issue Form links
+# elsewhere in this repo).
 REMOVAL_FORM = "https://github.com/darylc/fpp-data-ci/issues/new?template=submit_remove_plugin.yml"
+REMOVAL_GUIDED_PAGE = "https://darylc.github.io/fpp-data-ci/submit_remove_plugin/"
+SUBMISSION_GUIDED_PAGE = "https://darylc.github.io/fpp-data-ci/submit_new_plugin/"
 STALE_MONTHS = 18
 
 

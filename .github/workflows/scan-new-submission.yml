@@ -128,9 +128,11 @@ jobs:
             const infoUrl = field('pluginInfo.json raw URL');
             const repoName = field('repoName');
             const category = field('Category');
+            const repoUrl = field('GitHub repo');
             core.setOutput('plugininfo_url', infoUrl === '_No response_' ? '' : infoUrl);
             core.setOutput('repo_name', repoName === '_No response_' ? '' : repoName);
             core.setOutput('category', category === '_No response_' ? '' : category);
+            core.setOutput('repo_url', repoUrl === '_No response_' ? '' : repoUrl);
 
       - name: Run compliance scan
         if: steps.authz.outputs.ok == 'true' && steps.extract.outputs.plugininfo_url != ''
@@ -279,7 +281,26 @@ jobs:
               .filter(f => f.severity !== 'optional')
               .sort((a, b) => (order[a.severity] ?? 3) - (order[b.severity] ?? 3));
 
+            const reporter = context.payload.issue.user.login;
+            const repoUrl = '${{ steps.extract.outputs.repo_url }}';
+            const registeredOwner = result.owner;
+            const isThirdParty = registeredOwner && registeredOwner.toLowerCase() !== reporter.toLowerCase();
+
             const lines = [`Adds \`${repoName}\` to \`pluginList.json\`, requested in #${issue_number}.`, ''];
+            if (repoUrl) lines.push(`**Plugin repo:** ${repoUrl}`);
+            lines.push(`**Submitted by:** @${reporter}`);
+            if (registeredOwner) {
+              lines.push(`**Registered owner (from srcURL):** @${registeredOwner}` +
+                (isThirdParty
+                  ? ' — ⚠️ **different from the submitter.** There is currently no automated check that ' +
+                    'the owner has consented to this listing (unlike removal requests, submissions don\'t ' +
+                    'verify ownership) — worth confirming before merging, and note the contact email on ' +
+                    'file is the submitter\'s, not necessarily the owner\'s.'
+                  : ' (matches submitter)'));
+            } else {
+              lines.push('**Registered owner:** could not be resolved from srcURL');
+            }
+            lines.push('');
             if (result.pass) {
               lines.push('✅ The automated compliance scan passed — no blocking issues found.', '');
             } else {

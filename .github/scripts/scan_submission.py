@@ -115,6 +115,7 @@ def main():
     result = {
         "pass": not blocking,
         "linted": linted,
+        "owner": gh[0] if gh else None,   # registered owner from srcURL — may differ from the submitter
         "findings": [{"severity": s, "code": c, "message": m} for s, c, m in findings],
         "num_blocking": len(blocking),
         "num_advisory": len(advisory),

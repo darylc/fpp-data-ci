@@ -117,17 +117,13 @@ jobs:
               msg.push('', '_Note: could not clone the repo to run the static lint — only pluginInfo.json itself was checked._');
             }
 
+            // A fresh comment per run, not an edit-in-place: a /recheck after pushing a
+            // fix should visibly show up as a new result, not silently rewrite history
+            // in a way that's easy to miss or lose track of what changed.
             const full = `${MARKER}\n${msg.join('\n')}`;
             const { owner, repo } = context.repo;
             const issue_number = context.payload.issue.number;
-
-            const comments = await github.rest.issues.listComments({ owner, repo, issue_number });
-            const existing = comments.data.find(c => c.body && c.body.includes(MARKER));
-            if (existing) {
-              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: full });
-            } else {
-              await github.rest.issues.createComment({ owner, repo, issue_number, body: full });
-            }
+            await github.rest.issues.createComment({ owner, repo, issue_number, body: full });
 
             if (!result.pass) {
               await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['needs-manual-review'] });

@@ -325,8 +325,12 @@ async function generate() {
     const token = PREFIX + "\n" + wrap(b64(ct));
 
     // Issue Forms prefill from query params keyed by field id. Checkboxes can't be
-    // prefilled — the acknowledgements stay on GitHub, ticked deliberately.
-    const qs = new URLSearchParams({ template: TEMPLATE, ...v, contact_token: token });
+    // prefilled — the acknowledgements stay on GitHub, ticked deliberately. `title` is
+    // a special top-level param (not a field id) that overrides the template's default
+    // "do not edit this title" placeholder with the actual plugin name.
+    const qs = new URLSearchParams({
+      template: TEMPLATE, title: `[Plugin] ${v.display_name}`, ...v, contact_token: token,
+    });
     const url = `https://github.com/${REPO}/issues/new?${qs}`;
 
     $("continue").href = url;

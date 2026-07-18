@@ -24,6 +24,19 @@
 # with a finding and comments `/submit` to say so explicitly. `/submit` doesn't bypass
 # the scan silently — it still runs and still reports findings, it just adds the label
 # regardless of the result, with a note that the submitter chose to proceed anyway.
+#
+# LISTING PR: the moment a submission is ready (pass or /submit), this also opens a PR
+# adding it to pluginList.json — add_plugin_entry.py. No further validation runs against
+# that PR by design: schema, repoName match, and archived/issues-disabled all already
+# ran in scan_submission.py above to decide "ready", and category validity is checked by
+# add_plugin_entry.py itself before it'll insert anything. validate-pluginlist.yml would
+# only add value if a maintainer hand-edits the entry before merging — and a human push
+# to the PR branch triggers it completely normally, no special-casing needed.
+#
+# Idempotent by construction: the branch name is deterministic (add-plugin/<repoName>),
+# rebuilt from master every run, and force-pushed — a later /recheck or /submit just
+# updates the same PR rather than piling up duplicates, and once master actually has the
+# entry (PR merged), add_plugin_entry.py reports ALREADY_LISTED and this becomes a no-op.
 
 name: Scan new plugin submission
 
@@ -35,6 +48,8 @@ on:
 
 permissions:
   issues: write
+  contents: write
+  pull-requests: write
 
 jobs:
   scan:
@@ -73,8 +88,10 @@ jobs:
             }
             const infoUrl = field('pluginInfo.json raw URL');
             const repoName = field('repoName');
+            const category = field('Category');
             core.setOutput('plugininfo_url', infoUrl === '_No response_' ? '' : infoUrl);
             core.setOutput('repo_name', repoName === '_No response_' ? '' : repoName);
+            core.setOutput('category', category === '_No response_' ? '' : category);
 
       - name: Run compliance scan
         if: steps.extract.outputs.plugininfo_url != ''
@@ -88,6 +105,7 @@ jobs:
             --out scan-result.json
 
       - name: Comment results
+        id: comment
         if: steps.extract.outputs.plugininfo_url != ''
         uses: actions/github-script@v7
         with:
@@ -157,7 +175,8 @@ jobs:
             // only appears once the submission actually IS ready: pass, or an explicit
             // /submit override. A plain failing scan adds nothing — most submitters fix
             // and /recheck without ever needing a maintainer in the loop.
-            if (result.pass || isSubmitOverride) {
+            const ready = result.pass || isSubmitOverride;
+            if (ready) {
               await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['needs-manual-review'] });
             } else {
               // Clear a stale "ready" label if an edit made a previously-passing/overridden
@@ -168,3 +187,93 @@ jobs:
                 if (e.status !== 404) throw e;   // 404 = label wasn't there; fine
               }
             }
+            core.setOutput('ready', String(ready));
+
+      - name: Add pluginList.json entry on a branch
+        id: edit
+        if: steps.comment.outputs.ready == 'true'
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          BRANCH="add-plugin/${{ steps.extract.outputs.repo_name }}"
+          git checkout -B "$BRANCH"
+
+          OUT=$(python .github/scripts/add_plugin_entry.py \
+            --plugin-list pluginList.json \
+            --categories pluginCategories.json \
+            --repo-name "${{ steps.extract.outputs.repo_name }}" \
+            --plugininfo-url "${{ steps.extract.outputs.plugininfo_url }}" \
+            --category "${{ steps.extract.outputs.category }}") || true
+          echo "$OUT"
+          {
+            echo "status<<EOF"
+            echo "$OUT"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+          if [[ "$OUT" == ADDED* ]]; then
+            git add pluginList.json
+            git commit -m "Add ${{ steps.extract.outputs.repo_name }} to pluginList.json
+
+          Requested in #${{ github.event.issue.number }}."
+            git push -f origin "$BRANCH"
+          fi
+
+      - name: Open or update the listing PR
+        if: steps.comment.outputs.ready == 'true' && startsWith(steps.edit.outputs.status, 'ADDED')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.issue.number;
+            const branch = '${{ steps.edit.outputs.branch }}';
+            const repoName = '${{ steps.extract.outputs.repo_name }}';
+
+            const existing = await github.rest.pulls.list({ owner, repo, head: `${owner}:${branch}`, state: 'open' });
+            let pr = existing.data[0];
+            const body = `Adds \`${repoName}\` to \`pluginList.json\`, requested in #${issue_number}.\n\n` +
+              'Opened automatically once the submission was ready (compliance scan passed, or the ' +
+              'reporter used `/submit`) — schema, repoName match, category, and archived/issues-disabled ' +
+              'were already checked before this PR existed. `validate-pluginlist.yml` will only run here ' +
+              'if a maintainer pushes a hand-edit to this branch before merging.';
+
+            if (!pr) {
+              const created = await github.rest.pulls.create({
+                owner, repo, title: `[Plugin] Add ${repoName}`, body, head: branch, base: 'master',
+              });
+              pr = created.data;
+            }
+
+            const MARKER = '<!-- submission-listing-pr -->';
+            await github.rest.issues.createComment({
+              owner, repo, issue_number,
+              body: `${MARKER}\n📦 Listing PR: ${pr.html_url}`,
+            });
+
+      - name: Comment if already listed
+        if: steps.comment.outputs.ready == 'true' && startsWith(steps.edit.outputs.status, 'ALREADY_LISTED')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.issue.number;
+            await github.rest.issues.createComment({
+              owner, repo, issue_number,
+              body: `\`${{ steps.extract.outputs.repo_name }}\` is already in \`pluginList.json\` — nothing to do here.`,
+            });
+
+      - name: Comment if the category couldn't be matched
+        if: steps.comment.outputs.ready == 'true' && startsWith(steps.edit.outputs.status, 'UNKNOWN_CATEGORY')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.issue.number;
+            await github.rest.issues.createComment({
+              owner, repo, issue_number,
+              body: "⚠️ Couldn't open the listing PR: the **Category** field on this issue doesn't match " +
+                    "any category name. Edit the issue's Category field to one of the dropdown options, " +
+                    "then comment `/recheck`.",
+            });

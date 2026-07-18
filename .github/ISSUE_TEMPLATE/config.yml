@@ -9,15 +9,10 @@ contact_links:
   # Issue Forms are static YAML and cannot run JS, which is why this is a separate
   # page rather than a step inside the form itself.
   # SANDBOX URL — swap to https://falconchristmas.github.io/fpp-data/contact/ upstream.
+  #
+  # Contribution Guidelines / FPP Facebook Group / FPP Plugin Template links were
+  # dropped from this chooser (2026-07-18) — they clutter the "New issue" screen and
+  # are already linked from within the plugin-submission.yml form body.
   - name: ⚡ Submit a plugin — start here (guided)
     url: https://darylc.github.io/fpp-data-ci/contact/
     about: Recommended. Fills in the submission form for you and encrypts your contact email.
-  - name: Contribution Guidelines
-    url: https://github.com/FalconChristmas/fpp-data/blob/master/CONTRIBUTING.md
-    about: Read this before submitting — schema, categories, and review policy.
-  - name: FPP Facebook Group
-    url: https://www.facebook.com/groups/1554782254796752
-    about: Announce your plugin and get community feedback first.
-  - name: FPP Plugin Template
-    url: https://github.com/FalconChristmas/fpp-plugin-Template
-    about: A working example plugin with a valid pluginInfo.json to copy from.

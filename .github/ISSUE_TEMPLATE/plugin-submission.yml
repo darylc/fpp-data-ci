@@ -23,22 +23,7 @@ body:
       value: |
         ## 🛑 You should only arrive here via https://darylc.github.io/fpp-data-ci/contact/ which will pre-fill this form for you.
 
-      
-        That page fills in every field below for you and encrypts your contact email so
-        it never appears publicly. Submitting this form by hand means we have no way to
-        contact you, and it **will be sent back** unfilled.
-
-
-        If the fields below are **already filled in**, you came from the guided page —
-        carry on, tick the acknowledgements at the bottom, and submit. 👍
-
-        ---
-
-        Also worth reading: the
-        [Contribution Guidelines](https://github.com/FalconChristmas/fpp-data/blob/master/CONTRIBUTING.md),
-        and make sure your plugin ships a valid `pluginInfo.json`
-        (see [fpp-plugin-Template](https://github.com/FalconChristmas/fpp-plugin-Template)).
-
+  
   - type: input
     id: display_name
     attributes:
@@ -141,13 +126,9 @@ body:
       options:
         - label: I tested this plugin on the latest released version of FPP **and** the current nightly build.
           required: true
-        - label: My repository includes a license.
-          required: true
-        - label: My plugin creates at most **one** menu item in each FPP menu and follows FPP UI conventions.
-          required: true
         - label: My plugin does not interfere with core FPP functionality, stability, or real-time sequence playback, and installs cleanly (or refuses with an explanation) on hardware it can't support.
           required: true
-        - label: My plugin is not malicious and does not exfiltrate data or run unexpected remote code.
+        - label: My plugin is not malicious and does not and will not in future exfiltrate data or run unexpected remote code.
           required: true
         - label: I understand inclusion is at the FPP developers' discretion and is not guaranteed.
           required: true

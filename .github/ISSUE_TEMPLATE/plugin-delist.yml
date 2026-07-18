@@ -9,7 +9,7 @@
 
 name: Retire / de-list a plugin
 description: Request that your plugin be removed from FPP's Plugin Manager list.
-title: "[De-list] <your-repoName>"
+title: "[De-list plugin request]"
 labels: ["plugin", "delist-request"]
 body:
   - type: markdown

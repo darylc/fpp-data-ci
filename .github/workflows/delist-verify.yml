@@ -8,10 +8,11 @@
 #   delist-error           couldn't resolve the plugin
 # It never blocks — a maintainer still reviews the actual removal.
 #
-# It also retitles the issue from the literal "[De-list] <your-repoName>"
-# placeholder (Issue Forms can't template the title from a field value) to the
-# actual repoName the submitter typed, so the issue queue is scannable at a
-# glance instead of every row saying the same placeholder text.
+# It also retitles the issue from the bare "[De-list plugin request]" (Issue
+# Forms can't template the title from a field value, so the form leaves it as
+# just that prefix rather than a confusing "<your-repoName>" placeholder) to
+# "[De-list plugin request] <repoName>" using what the submitter typed, so the
+# issue queue is scannable at a glance.
 
 name: Verify de-list ownership
 
@@ -65,7 +66,7 @@ jobs:
               } catch (e) { /* not a real URL -- use as typed */ }
             }
 
-            const wantTitle = `[De-list] ${repoName}`;
+            const wantTitle = `[De-list plugin request] ${repoName}`;
             if (context.payload.issue.title === wantTitle) return;
 
             const {owner, repo} = context.repo;

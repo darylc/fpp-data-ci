@@ -202,13 +202,18 @@ const setMsg = (el, text, cls) => { el.textContent = text; el.className = "msg" 
 
 const sel = $("category");
 
-// list = [[shortName, longName], …]. The submitter reads the long name; the option's
-// VALUE stays the short name, because that's what goes into pluginList.json and what
-// the Issue Form's dropdown expects when we prefill it.
+// list = [[shortName, longName], …]. The option's VALUE must be the longName, not the
+// shortName: the Issue Form's category dropdown (plugin-submission.yml) can only show
+// longName strings — a static YAML dropdown has no separate label/value, so its options
+// ARE longName — and GitHub's issue prefill only pre-selects a dropdown option when the
+// query-param value matches one of its option strings EXACTLY. Sending shortName here
+// silently fails to match, leaving Category unselected on the prefilled issue. Whoever
+// transcribes an accepted submission into pluginList.json maps longName back to
+// shortName via pluginCategories.json (see check_category_drift.py).
 function fillCategories(list) {
   sel.replaceChildren();
   sel.append(new Option("— choose —", ""));
-  for (const [short, long] of list) sel.append(new Option(long || short, short));
+  for (const [short, long] of list) sel.append(new Option(long || short, long || short));
 }
 
 // Show the fallback immediately so the form is usable even before/without the fetch.

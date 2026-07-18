@@ -1,0 +1,73 @@
+# Auto-verify ownership on a de-list request.
+#
+# When a `delist-request` issue is opened/edited, GitHub has already authenticated
+# the submitter, so we know their real login. This checks it against the plugin's
+# repo owner (from srcURL) and posts a sticky comment + a verdict label:
+#   owner-verified        submitter owns the repo (or it's archived/gone)
+#   ownership-unconfirmed  org repo / not the owner → asks for proof (delist:true)
+#   delist-error           couldn't resolve the plugin
+# It never blocks — a maintainer still reviews the actual removal.
+
+name: Verify de-list ownership
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  verify:
+    # Only for de-list requests (the form applies this label).
+    if: contains(github.event.issue.labels.*.name, 'delist-request')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out fpp-data
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Verify ownership
+        id: verify
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          python .github/scripts/verify_delist.py \
+            --plugin-list pluginList.json --output delist-verify.md
+
+      - name: Comment verdict + label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- delist-ownership-check -->';
+            const body = marker + '\n' + fs.readFileSync('delist-verify.md', 'utf8');
+            const {owner, repo} = context.repo;
+            const issue_number = context.issue.number;
+
+            // sticky comment
+            const comments = await github.rest.issues.listComments({owner, repo, issue_number});
+            const existing = comments.data.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({owner, repo, comment_id: existing.id, body});
+            } else {
+              await github.rest.issues.createComment({owner, repo, issue_number, body});
+            }
+
+            // verdict label (swap the three, keep whatever else is there)
+            const verdict = '${{ steps.verify.outputs.verdict }}';
+            const map = {verified: 'owner-verified', unconfirmed: 'ownership-unconfirmed', error: 'delist-error'};
+            const want = map[verdict];
+            for (const l of Object.values(map)) {
+              if (l !== want) {
+                try { await github.rest.issues.removeLabel({owner, repo, issue_number, name: l}); } catch (e) {}
+              }
+            }
+            if (want) await github.rest.issues.addLabels({owner, repo, issue_number, labels: [want]});

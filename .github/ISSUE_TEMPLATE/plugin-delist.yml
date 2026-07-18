@@ -1,0 +1,70 @@
+# GitHub Issue Form — "Retire / de-list a plugin".
+#
+# WHAT THIS IS: the opt-out counterpart to plugin-submission. An author who no longer
+# wants to maintain their plugin (e.g. rather than update it for a new FPP major) fills
+# this in to request removal from pluginList.json. A maintainer then merges the removal
+# (moving it to oldplugins/ where appropriate).
+#
+# WHERE IT LIVES: FalconChristmas/fpp-data/.github/ISSUE_TEMPLATE/plugin-delist.yml
+
+name: Retire / de-list a plugin
+description: Request that your plugin be removed from FPP's Plugin Manager list.
+title: "[De-list] <your-repoName>"
+labels: ["plugin", "delist-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form to have your plugin **removed** from `pluginList.json` — for
+        example if you no longer wish to maintain it, or don't intend to update it for
+        the current FPP release. Existing installs keep working; the plugin simply
+        stops being listed for new installs.
+
+  - type: input
+    id: repoName
+    attributes:
+      label: Plugin repoName
+      description: The `repoName` exactly as it appears in pluginList.json.
+      placeholder: fpp-my-plugin
+    validations:
+      required: true
+
+  - type: dropdown
+    id: reason
+    attributes:
+      label: Reason
+      options:
+        - No longer maintained
+        - Not being updated for the current FPP major
+        - Superseded by another plugin
+        - Duplicate / submitted in error
+        - Other (explain below)
+    validations:
+      required: true
+
+  - type: input
+    id: successor
+    attributes:
+      label: Replacement / successor (optional)
+      description: If another plugin supersedes this one, its repoName or URL.
+      placeholder: fpp-my-plugin-ng
+    validations:
+      required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else?
+      description: Optional context for the maintainers.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: ack
+    attributes:
+      label: Confirmation
+      options:
+        - label: I am the author/maintainer (or authorized) and want this plugin de-listed.
+          required: true
+        - label: I understand existing installs are unaffected; only the listing is removed.
+          required: true

@@ -1,0 +1,58 @@
+# Daily FPP-major compatibility re-check.
+#
+# WHAT THIS IS: the lightweight counterpart to plugin-compliance-scan. It does NOT
+# clone or lint — it just re-fetches each pluginInfo.json and re-evaluates whether a
+# versions[] entry now declares FPP-<major> support. When a plugin has become
+# compatible, its open tracking issue is commented and CLOSED automatically (verified,
+# not self-reported). Authors are never @-mentioned; closing an issue notifies no one.
+#
+# Runs the campaign scanner in metadata-only mode (no --plugins-dir), so it's fast.
+# TARGET_MAJOR comes from the repo variable CAMPAIGN_TARGET_MAJOR (default 10).
+
+name: Daily FPP compatibility check
+
+on:
+  schedule:
+    - cron: "17 6 * * *"   # 06:17 UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  TARGET_MAJOR: ${{ vars.CAMPAIGN_TARGET_MAJOR || '10' }}
+
+jobs:
+  recheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out fpp-data
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Re-evaluate FPP-${{ env.TARGET_MAJOR }} compatibility (metadata only)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python .github/scripts/campaign_scan.py \
+            --target-major "$TARGET_MAJOR" \
+            --plugin-list pluginList.json \
+            --out out
+
+      - name: Close issues for plugins that became compatible
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python .github/scripts/sync_issues.py \
+            --summary out/summary.json --mode reconcile
+
+      - name: Upload refreshed dashboard
+        uses: actions/upload-artifact@v4
+        with:
+          name: fpp-compat-dashboard
+          path: out/dashboard.md

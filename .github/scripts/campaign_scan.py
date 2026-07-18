@@ -1,0 +1,266 @@
+"""Major-release plugin compliance & certification scanner (campaign backbone).
+
+For a target FPP major, walks every entry in pluginList.json and, per plugin:
+  * evaluates whether any versions[] entry declares compatibility with the major
+    (the implicit "certified for FPP <major>" signal — D21),
+  * runs the static compliance linter (lint_plugin.py) over its cloned tree,
+  * gathers repo metadata (Issues enabled?, archived?, last push) best-effort
+    from the GitHub API,
+and emits:
+  * dashboard.md   — one status row per plugin,
+  * issues/<repo>.md — a per-plugin draft tracking-issue body,
+  * summary.json   — machine-readable results.
+
+DRY RUN BY DESIGN: this never creates issues and never @-mentions an author.
+Maintainer handles are written as plain text (no leading @), so even if a body
+were posted by hand nobody is pinged. Real notification is a later, gated step.
+
+Usage:
+  campaign_scan.py --target-major 10 --plugin-list pluginList.json \
+      --plugins-dir <dir-of-clones> --out out/
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from datetime import datetime, timezone
+
+import lib_plugin_schema as lib
+from lint_plugin import lint_plugin_dir, ERROR, WARN, INFO
+
+GUIDELINES = "https://github.com/FalconChristmas/fpp-plugin-Template/blob/master/PLUGIN_GUIDELINES.md"
+FORMAT_DOC = "https://github.com/FalconChristmas/fpp-plugin-Template/blob/master/PLUGININFO_FORMAT.md"
+DELIST_FORM = "https://github.com/FalconChristmas/fpp-data/issues/new?template=plugin-delist.yml"
+STALE_MONTHS = 18
+
+
+def _major(v) -> int | None:
+    head = str(v).split(".")[0]
+    return int(head) if head.isdigit() else None
+
+
+def compatible_with_major(versions, m: int) -> bool:
+    """Is any versions[] entry certified for FPP major `m`?
+
+    Mirrors the Plugin Manager's own logic (D21): an OPEN-ended max ("0"/""/"0.0")
+    only certifies the major the entry was built for — an open entry built for an
+    OLDER major shows as "untested" on a newer one, not compatible. A CLOSED range
+    certifies `m` when min-major <= m <= max-major.
+    """
+    for v in versions or []:
+        if not isinstance(v, dict):
+            continue
+        mn = _major(v.get("minFPPVersion")) if v.get("minFPPVersion") else None
+        if mn is None:
+            continue
+        mx = v.get("maxFPPVersion")
+        if mx in (None, "", "0", "0.0"):
+            if mn == m:            # open-ended: certifies only its own major
+                return True
+        else:
+            mxm = _major(mx)
+            if mxm is not None and mn <= m <= mxm:
+                return True
+    return False
+
+
+def months_since(iso: str | None) -> int | None:
+    if not iso:
+        return None
+    try:
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return int((datetime.now(timezone.utc) - dt).days / 30)
+
+
+def load_plugininfo(entry_url, plugin_dir):
+    """Prefer the local clone's pluginInfo.json; fall back to the URL."""
+    if plugin_dir:
+        p = os.path.join(plugin_dir, "pluginInfo.json")
+        if os.path.isfile(p):
+            try:
+                with open(p, encoding="utf-8") as f:
+                    return json.load(f), None
+            except (OSError, json.JSONDecodeError) as e:
+                return None, f"local pluginInfo.json unreadable: {e}"
+    if entry_url:
+        return lib.fetch_json(entry_url)
+    return None, "no pluginInfo source"
+
+
+def scan_plugin(entry, target, plugins_dir, token):
+    name = entry[0]
+    info_url = entry[1] if len(entry) > 1 else None
+    plugin_dir = os.path.join(plugins_dir, name) if plugins_dir else None
+    if plugin_dir and not os.path.isdir(plugin_dir):
+        plugin_dir = None
+
+    info, err = load_plugininfo(info_url, plugin_dir)
+    info = info or {}
+    findings = []          # (severity, code, message)
+    if err:
+        findings.append((WARN, "plugininfo", err))
+
+    # --- author-requested de-list (machine signal / proof-of-control) --------
+    delisted = bool(info.get("delist"))
+    if delisted:
+        findings.append((INFO, "delist",
+                         "author set \"delist\": true in pluginInfo.json — de-list requested"))
+
+    # --- version compatibility (the primary campaign signal) ----------------
+    versions = info.get("versions") or []
+    certified = compatible_with_major(versions, target)
+
+    # --- repo metadata (best-effort) ----------------------------------------
+    owner = None
+    meta = {}
+    src = lib.parse_github_repo(info.get("srcURL", "") or "")
+    if src:
+        owner, repo = src
+        data, merr = lib.gh_get_repo(owner, repo, token)
+        if data:
+            meta = data
+            if data.get("archived"):
+                findings.append((WARN, "archived", "source repo is archived"))
+            bug = lib.parse_github_repo(info.get("bugURL", "") or "")
+            if data.get("has_issues") is False:
+                findings.append((WARN, "issues-disabled",
+                                 "GitHub Issues are disabled — users can't report bugs and we "
+                                 "can't reach you there"))
+            elif not bug:
+                findings.append((INFO, "bugurl", "no bugURL set (Report-a-Bug link)"))
+
+    # --- static compliance lint (needs a clone) -----------------------------
+    linted = False
+    if plugin_dir:
+        linted = True
+        for f in lint_plugin_dir(plugin_dir, name):
+            findings.append((f.severity, f.code, f.message))
+
+    # --- status --------------------------------------------------------------
+    stale = months_since(meta.get("pushed_at"))
+    if delisted:
+        status = "delist-requested"
+    elif certified:
+        status = "compatible"
+    elif meta.get("archived") or (stale is not None and stale >= STALE_MONTHS):
+        status = "unmaintained"
+    else:
+        status = "needs-update"
+
+    return {
+        "name": name,
+        "owner": owner,
+        "status": status,
+        "certified": certified,
+        "delisted": delisted,
+        "issues_enabled": meta.get("has_issues"),
+        "archived": meta.get("archived"),
+        "months_since_push": stale,
+        "linted": linted,
+        "findings": findings,
+        "num_errors": sum(1 for s, _, _ in findings if s == ERROR),
+        "num_warn": sum(1 for s, _, _ in findings if s == WARN),
+        "num_info": sum(1 for s, _, _ in findings if s == INFO),
+    }
+
+
+ICON = {"compatible": "✅", "needs-update": "🔧", "unmaintained": "💤",
+        "delist-requested": "🗑️"}
+
+
+def issue_body(r, target):
+    L = []
+    L.append(f"<!-- plugin:{r['name']} campaign:fpp{target} -->")
+    L.append(f"> **DRY RUN — draft only. The maintainer has NOT been notified.**")
+    L.append("")
+    L.append(f"## {r['name']} — FPP {target} readiness")
+    if r["owner"]:
+        L.append(f"Maintainer: `{r['owner']}` (https://github.com/{r['owner']}) "
+                 f"*(not @-mentioned in this dry run)*")
+    L.append("")
+    # compatibility
+    if r["certified"]:
+        L.append(f"### ✅ Compatibility\nA `versions[]` entry already declares FPP {target} support.")
+    else:
+        L.append(f"### 🔧 Please declare FPP {target} compatibility")
+        L.append(f"Add a `versions[]` entry to your `pluginInfo.json` once tested on FPP {target}:")
+        L.append("```json\n{\n"
+                 f'    "minFPPVersion": "{target}.0",\n'
+                 '    "maxFPPVersion": "0",\n'
+                 '    "branch": "master",\n'
+                 '    "sha": ""\n}\n```')
+        L.append(f"Until then the Plugin Manager shows your plugin as *untested with FPP {target}*.")
+    L.append("")
+    # findings
+    if r["findings"]:
+        L.append("### Areas of concern / optimisation")
+        order = {ERROR: 0, WARN: 1, INFO: 2}
+        badge = {ERROR: "🛑", WARN: "⚠️", INFO: "💡"}
+        for sev, code, msg in sorted(r["findings"], key=lambda f: order.get(f[0], 3)):
+            L.append(f"- {badge.get(sev, '')} **{code}** — {msg}")
+        L.append("")
+    L.append(f"Please review the [Plugin Guidelines]({GUIDELINES}) and "
+             f"[pluginInfo.json format]({FORMAT_DOC}).")
+    L.append("")
+    L.append(f"**Retiring this plugin instead?** Open a [de-list request]({DELIST_FORM}) and we'll "
+             f"remove it from the list — no update needed.")
+    return "\n".join(L)
+
+
+def build_dashboard(results, target):
+    total = len(results)
+    by = lambda s: sum(1 for r in results if r["status"] == s)
+    L = [f"# FPP {target} plugin readiness — {datetime.now(timezone.utc):%Y-%m-%d}",
+         "",
+         f"{total} plugins · ✅ {by('compatible')} compatible · "
+         f"🔧 {by('needs-update')} need update · 💤 {by('unmaintained')} unmaintained",
+         "",
+         "| Plugin | Status | FPP-compat | Issues | Last push | 🛑 | ⚠️ | 💡 |",
+         "|---|---|---|---|---|--:|--:|--:|"]
+    for r in sorted(results, key=lambda r: (r["status"] != "needs-update", r["name"].lower())):
+        issues = {True: "on", False: "**off**", None: "?"}[r["issues_enabled"]]
+        push = f"{r['months_since_push']}mo" if r["months_since_push"] is not None else "?"
+        L.append(f"| {r['name']} | {ICON.get(r['status'], '')} {r['status']} | "
+                 f"{'yes' if r['certified'] else 'no'} | {issues} | {push} | "
+                 f"{r['num_errors'] or ''} | {r['num_warn'] or ''} | {r['num_info'] or ''} |")
+    return "\n".join(L)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--target-major", type=int, required=True)
+    ap.add_argument("--plugin-list", default="pluginList.json")
+    ap.add_argument("--plugins-dir", default=None, help="dir of cloned plugins (named by repoName)")
+    ap.add_argument("--out", default="out")
+    ap.add_argument("--limit", type=int, default=0, help="scan only first N (testing)")
+    args = ap.parse_args()
+
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    entries = lib.load_pluginlist(args.plugin_list)
+    if args.limit:
+        entries = entries[: args.limit]
+
+    os.makedirs(os.path.join(args.out, "issues"), exist_ok=True)
+    results = []
+    for entry in entries:
+        r = scan_plugin(entry, args.target_major, args.plugins_dir, token)
+        results.append(r)
+        with open(os.path.join(args.out, "issues", f"{r['name']}.md"), "w", encoding="utf-8") as f:
+            f.write(issue_body(r, args.target_major))
+        print(f"{ICON.get(r['status'],'')} {r['name']:34} {r['status']:13} "
+              f"E{r['num_errors']} W{r['num_warn']} I{r['num_info']}"
+              f"{'' if r['linted'] else '  (no clone — metadata only)'}")
+
+    with open(os.path.join(args.out, "dashboard.md"), "w", encoding="utf-8") as f:
+        f.write(build_dashboard(results, args.target_major))
+    with open(os.path.join(args.out, "summary.json"), "w", encoding="utf-8") as f:
+        json.dump({"target_major": args.target_major, "plugins": results}, f, indent=2)
+    print(f"\nWrote {args.out}/dashboard.md, {len(results)} issue drafts, summary.json")
+
+
+if __name__ == "__main__":
+    main()

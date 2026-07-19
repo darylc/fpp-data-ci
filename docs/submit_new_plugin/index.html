@@ -281,7 +281,7 @@ async function generate() {
     // a special top-level param (not a field id) that overrides the template's default
     // "do not edit this title" placeholder with the actual plugin name.
     const qs = new URLSearchParams({
-      template: TEMPLATE, title: `[Plugin] ${displayName || repoName}`, ...v, contact_token: token,
+      template: TEMPLATE, title: `[New plugin request] ${displayName || repoName}`, ...v, contact_token: token,
     });
     const url = `https://github.com/${REPO}/issues/new?${qs}`;
 

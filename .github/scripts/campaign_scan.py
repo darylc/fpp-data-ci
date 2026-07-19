@@ -70,6 +70,25 @@ def compatible_with_major(versions, m: int) -> bool:
     return False
 
 
+def highest_supported_major(versions) -> int | None:
+    """Highest FPP major any versions[] entry certifies for, open- or closed-ended.
+
+    None if there are no usable versions[] entries at all.
+    """
+    highest = None
+    for v in versions or []:
+        if not isinstance(v, dict):
+            continue
+        mn = _major(v.get("minFPPVersion")) if v.get("minFPPVersion") else None
+        if mn is None:
+            continue
+        mx = v.get("maxFPPVersion")
+        cand = mn if mx in (None, "", "0", "0.0") else (_major(mx) or mn)
+        if highest is None or cand > highest:
+            highest = cand
+    return highest
+
+
 def months_since(iso: str | None) -> int | None:
     if not iso:
         return None
@@ -132,9 +151,16 @@ def scan_plugin(entry, target, plugins_dir, token, schema):
     # --- version compatibility (the primary campaign signal) ----------------
     versions = info.get("versions") or []
     certified = compatible_with_major(versions, target)
+    last_major = highest_supported_major(versions)
+    if last_major is not None and last_major < target:
+        findings.append((BLOCKER, "stale-major",
+                         f"Highest FPP major version declared is {last_major}, "
+                         f"behind the current target FPP {target}"))
 
     # --- repo metadata (best-effort) ----------------------------------------
     owner = None
+    owner_is_org = False
+    maintainer_candidates = []
     meta = {}
     src = lib.parse_github_repo(info.get("srcURL", "") or "")
     if src:
@@ -143,6 +169,12 @@ def scan_plugin(entry, target, plugins_dir, token, schema):
         if data:
             meta = data
             findings.extend(lib.repo_metadata_findings(meta, info.get("bugURL", "")))
+            # An org login isn't a person - nobody gets notified by mentioning it (an
+            # org member has to already be watching the repo). Surface the repo's own
+            # top contributors instead, as the individuals actually likely to see this.
+            owner_is_org = (meta.get("owner") or {}).get("type") == "Organization"
+            if owner_is_org:
+                maintainer_candidates = lib.gh_get_contributors(owner, repo, token)
 
     # --- static compliance lint (needs a clone) -----------------------------
     linted = False
@@ -166,6 +198,8 @@ def scan_plugin(entry, target, plugins_dir, token, schema):
     return {
         "name": name,
         "owner": owner,
+        "owner_is_org": owner_is_org,
+        "maintainer_candidates": maintainer_candidates,
         "status": status,
         "certified": certified,
         # certified only means "declares a versions[] entry for the target major" -
@@ -198,7 +232,23 @@ def issue_body(r, target, draft=True):
     L.append(f"## {r['name']} - FPP {target} readiness")
     if r["owner"]:
         mention = "not @-mentioned in this dry run" if draft else "not @-mentioned - see MENTION_OWNER"
-        L.append(f"Maintainer: `{r['owner']}` (https://github.com/{r['owner']}) *({mention})*")
+        if r.get("owner_is_org"):
+            # An org login isn't a person - @-mentioning it doesn't notify anyone
+            # who isn't already watching the repo. maintainer_candidates come from
+            # commit history only (GET .../contributors), NOT a verified access
+            # check - fpp-data-ci's token has no standing to query real collaborator
+            # permissions on a repo it doesn't own, so these are a best-effort lead,
+            # not a confirmed maintainer list.
+            if r.get("maintainer_candidates"):
+                names = ", ".join(f"`{c}`" for c in r["maintainer_candidates"])
+                L.append(f"Maintainer: `{r['owner']}` org (repo owned by an org, not an individual - "
+                         f"org mentions don't reliably notify anyone). Candidate contributors "
+                         f"(commit history only, access **not verified**): {names} *({mention})*")
+            else:
+                L.append(f"Maintainer: `{r['owner']}` org (repo owned by an org, not an individual - "
+                         f"no individual maintainer could be identified) *({mention})*")
+        else:
+            L.append(f"Maintainer: `{r['owner']}` (https://github.com/{r['owner']}) *({mention})*")
     L.append("")
     L.append(f"> ℹ️ FPP's plugin **submission** and **removal** process has been streamlined - see the "
              f"[Plugin Guidelines]({GUIDELINES}) for what's expected of a listed plugin. Adding another "

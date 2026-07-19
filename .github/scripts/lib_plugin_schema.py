@@ -183,6 +183,29 @@ def gh_get_repo(owner: str, repo: str, token: Optional[str]) -> tuple[Optional[d
         return None, str(e)
 
 
+def gh_get_contributors(owner: str, repo: str, token: Optional[str], limit: int = 5) -> list[str]:
+    """Top `limit` contributor logins (by commit count, the API's default order)
+    for owner/repo. Public endpoint, no special access needed.
+
+    Used when a plugin's repo is org-owned (see campaign_scan.py): the org login
+    itself isn't a person who can be @-mentioned or notified, so the individual
+    contributors most likely to actually see a tracking issue are surfaced
+    instead. Best-effort - returns [] on any failure (private/empty repo, rate
+    limit, anonymous-only history, etc.), never raises.
+    """
+    api = f"https://api.github.com/repos/{owner}/{repo}/contributors?per_page={limit}"
+    headers = {"User-Agent": USER_AGENT, "Accept": "application/vnd.github+json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        req = urllib.request.Request(api, headers=headers)
+        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
+            data = json.loads(resp.read().decode("utf-8", "replace"))
+        return [c["login"] for c in data if isinstance(c, dict) and c.get("login") and not c.get("type") == "Bot"][:limit]
+    except Exception:  # noqa: BLE001
+        return []
+
+
 def list_open_issues(gh_repo: str, label: str, token: Optional[str]) -> list[dict]:
     """Open issues on `gh_repo` (\"owner/repo\") carrying `label`. One page (100) is
     plenty for this repo's issue volume - not worth paginating.

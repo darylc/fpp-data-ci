@@ -70,7 +70,12 @@ jobs:
     # a URL ending in `/submit_remove_plugin/`. The "Restrict..." step below
     # does the precise, word-boundary command match that actually decides
     # whether a real command was used.
+    #
+    # `state == 'open'` blocks /recheck and /submit once the issue is closed
+    # (verified/not-listed auto-close, or a maintainer closing it by hand) --
+    # nothing left to re-verify once it's resolved.
     if: >-
+      github.event.issue.state == 'open' &&
       contains(github.event.issue.labels.*.name, 'removal-request') &&
       (github.event_name != 'issue_comment' ||
        contains(github.event.comment.body, '/recheck') ||

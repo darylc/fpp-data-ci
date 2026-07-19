@@ -56,20 +56,28 @@ def fetch_json(url: str) -> tuple[Optional[Any], Optional[str]]:
 
 
 def resolve_repo_name(value: str) -> str:
-    """Accept a bare repoName OR a GitHub URL and return just the repo name.
+    """Accept a bare repoName, a bare "owner/repo" shorthand, or a GitHub URL, and
+    return just the repo name.
 
-    Submitters of the Request Plugin Removal Issue Form often paste a URL into the "Plugin
-    repoName" field instead of the bare name FPP actually stores in
-    pluginList.json — a repo page (`github.com/<owner>/<repo>`, with or without
-    `.git`, `/issues`, `/blob/<branch>/pluginInfo.json`, ...) or a raw file URL
-    (`raw.githubusercontent.com/<owner>/<repo>/<branch>/pluginInfo.json`). Be
-    forgiving rather than failing the request outright: `repoName` is required
-    (by CONTRIBUTING.md) to match the GitHub repo name, so the repo segment of
-    either URL shape IS the repoName.
+    Submitters of the Request Plugin Removal Issue Form often paste something other
+    than the bare name FPP actually stores in pluginList.json — a repo page
+    (`github.com/<owner>/<repo>`, with or without `.git`, `/issues`,
+    `/blob/<branch>/pluginInfo.json`, ...), a raw file URL
+    (`raw.githubusercontent.com/<owner>/<repo>/<branch>/pluginInfo.json`), or just
+    `<owner>/<repo>` shorthand with no host at all (what the guided page's repo-input
+    parser also accepts). Be forgiving rather than failing the request outright:
+    `repoName` is required (by CONTRIBUTING.md) to match the GitHub repo name, so the
+    repo segment of any of these shapes IS the repoName.
     """
     v = (value or "").strip()
-    if not v or ("github.com" not in v and "githubusercontent.com" not in v):
+    if not v:
         return v
+    if "github.com" not in v and "githubusercontent.com" not in v:
+        # No recognizable host: could still be bare "owner/repo" shorthand (exactly
+        # one slash, no scheme) -- anything else (a plain repoName, or something that
+        # doesn't look like either shape) is returned as-is, unchanged.
+        m = re.match(r"^[A-Za-z0-9._-]+/([A-Za-z0-9._-]+?)(?:\.git)?$", v)
+        return m.group(1) if m else v
     try:
         from urllib.parse import urlparse
 

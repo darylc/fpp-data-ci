@@ -84,8 +84,7 @@
   <fieldset>
     <legend>Your plugin</legend>
 
-    <label for="repo_name">Plugin repoName or GitHub repo URL
-      <span class="hint">— whatever you paste, we'll figure out the repoName on the next page</span></label>
+    <label for="repo_name">Your plugin's GitHub repo</label>
     <input id="repo_name" type="text" autocomplete="off" spellcheck="false" placeholder="fpp-my-plugin">
 
     <button id="go">Continue on GitHub →</button>
@@ -106,22 +105,31 @@ const setMsg = (el, text, cls) => { el.textContent = text; el.className = "msg" 
 // dropdowns and can't be prefilled at all (GitHub Issue Forms hard limitation, same
 // as Category on the submission page) — only repoName carries over; the rest is
 // picked directly on the real form.
+
+// Same input shapes submit_new_plugin/ accepts (full github.com or
+// raw.githubusercontent.com URL, or bare owner/repo), except an owner isn't required
+// here — removal only needs the plugin's repoName text, not a resolvable owner for
+// API calls, so a bare repo name with no slash at all is also accepted as-is.
+// Mirrors lib_plugin_schema.py's resolve_repo_name(), which does the authoritative
+// version of this same extraction server-side.
+function parseRepoInput(raw) {
+  const m = raw.match(/^(?:https?:\/\/)?(?:www\.)?(?:github\.com|raw\.githubusercontent\.com)\/([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?(?:\/.*)?$/)
+         || raw.match(/^([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?$/);
+  if (m) return { owner: m[1], repo: m[2] };
+  return { owner: null, repo: raw.replace(/\.git$/, "") };
+}
+
 function go() {
   const msg = $("msg");
   const repoName = $("repo_name").value.trim();
   if (!repoName) return setMsg(msg, "Please enter your plugin's repoName or repo URL.", "err");
 
-  // Title should show the bare repoName even if a full URL was pasted (same
-  // extraction remove-plugin-verify.yml does server-side) — "[Remove plugin
-  // request] https://github.com/owner/repo" would look wrong in the issue list.
-  let titleName = repoName;
-  if (repoName.includes("github.com") || repoName.includes("githubusercontent.com")) {
-    try {
-      const u = new URL(repoName.includes("://") ? repoName : `https://${repoName}`);
-      const parts = u.pathname.split("/").filter(Boolean);
-      if (parts.length >= 2) titleName = parts[1].replace(/\.git$/, "");
-    } catch (e) { /* not a real URL -- use as typed */ }
-  }
+  // Title should show the bare repoName even if a full URL (or owner/repo shorthand)
+  // was pasted — "[Remove plugin request] https://github.com/owner/repo" would look
+  // wrong in the issue list. The repoName FIELD sent below stays the raw text as
+  // typed; remove-plugin-verify.yml's resolve_repo_name() does its own authoritative
+  // extraction from that server-side, this is purely a display nicety.
+  const titleName = parseRepoInput(repoName).repo;
 
   const qs = new URLSearchParams({
     template: TEMPLATE, title: `[Remove plugin request] ${titleName}`, repoName,

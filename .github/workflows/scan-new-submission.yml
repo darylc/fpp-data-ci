@@ -412,8 +412,7 @@ jobs:
             }
             lines.push(
               'Schema, category, and archived/issues-disabled were already checked before ' +
-              'this PR existed — `validate-pluginlist.yml` will only run here if a maintainer pushes a ' +
-              'hand-edit to this branch before merging.', '',
+              'this PR existed.', '',
               '**Merging is entirely up to a maintainer\'s judgement** — this PR being open is not an approval, ' +
               'especially if it was opened via `/submit` over unresolved findings above.', '',
               `_A repo maintainer (or @${reporter}) can comment \`/recheck\` here to re-run the compliance ` +

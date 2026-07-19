@@ -2,7 +2,9 @@
 
 Runs the guideline/hygiene checks (the "areas of concern / optimisation"
 surfaced in a release-readiness scan) against a plugin's cloned directory.
-Pure standard library, no clone/network here - the caller provides a path.
+No clone/network here - the caller provides a path. Uses the third-party
+`jsonschema` package (already a hard dependency of this repo's other scan
+scripts) for the pluginInfo.json schema check.
 
 Each check yields a Finding(severity, code, message). Severities:
   blocker        - dangerous or breaks FPP/other users (reboots the box, kills a running
@@ -24,6 +26,17 @@ import os
 import re
 import sys
 from dataclasses import dataclass
+
+# schema_validation_error needs the third-party jsonschema package (a hard
+# dependency of this repo's other scan scripts, but lint_plugin.py itself was
+# previously stdlib-only and is used more widely/standalone) - degrade to
+# skipping just the schema check rather than making the whole linter unusable
+# wherever jsonschema isn't installed.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    from lib_plugin_schema import schema_validation_error
+except ImportError:
+    schema_validation_error = None
 
 BLOCKER, BEST_PRACTICE, OPTIONAL = "blocker", "best-practice", "optional"
 
@@ -348,13 +361,22 @@ def _socket_port_hits(root: str, port: int, exts=SCRIPT_EXT, window: int = 3):
                 break
 
 
-def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None = None) -> list[Finding]:
+def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None = None,
+                     schema: dict | None = None) -> list[Finding]:
     """Run all static checks against a plugin working tree; return findings.
 
     `info` is the plugin's already-parsed pluginInfo.json, if the caller has it (both
     new_major_release_scan.py and scan_submission.py load it anyway) - used for checks
     that need to cross-reference the manifest against the working tree, like the icon
     check.
+
+    `schema` is pluginInfo.schema.json, already parsed, if the caller wants the
+    schema check run HERE. Optional and off by default: new_major_release_scan.py
+    and scan_submission.py already call lib_plugin_schema.schema_validation_error()
+    themselves and report it through their own severity model - passing `schema`
+    here too would double-report the same finding for them. It exists so the
+    standalone CLI (`main()`, below) isn't blind to schema violations when run by
+    itself, since it has no other caller doing that check for it.
     """
     out: list[Finding] = []
     repo = repo_name or os.path.basename(os.path.normpath(root))
@@ -979,6 +1001,14 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
                    f"the no-arg registerApis()/unregisterApis() using drogon::app() or the fpphttp.h "
                    f"helpers (makeStringResponse(), getRequestArg(), etc.) directly"))
 
+    # pluginInfo.json schema validation. Off by default (see the `schema` param
+    # docstring above) - only runs when the caller explicitly passes a parsed
+    # schema, which today is just main()'s standalone CLI path.
+    if schema is not None and schema_validation_error is not None and info is not None:
+        schema_err = schema_validation_error(info, schema)
+        if schema_err:
+            out.append(Finding(BLOCKER, "schema-invalid", schema_err))
+
     return out
 
 
@@ -998,7 +1028,18 @@ def main(argv):
                 info = json.load(f)
         except (OSError, json.JSONDecodeError):
             info = None
-    findings = lint_plugin_dir(argv[1], argv[2] if len(argv) > 2 else None, info)
+    # Vendored alongside this script (.github/schema/pluginInfo.schema.json) -
+    # standalone CLI use has no other caller doing the schema check for it, so
+    # do it here (see lint_plugin_dir()'s `schema` param docstring).
+    schema = None
+    schema_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "schema", "pluginInfo.schema.json")
+    if os.path.isfile(schema_path):
+        try:
+            with open(schema_path, encoding="utf-8") as f:
+                schema = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            schema = None
+    findings = lint_plugin_dir(argv[1], argv[2] if len(argv) > 2 else None, info, schema)
     for f in findings:
         print(f"{f.severity.upper():5} [{f.code}] {f.message}")
     print(f"\n{len(findings)} finding(s)")

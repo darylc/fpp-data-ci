@@ -18,11 +18,25 @@ description: Do not open this directly — use the guided submission page instea
 title: "[New Plugin Submission - do not edit this title]"
 labels: ["plugin", "submission"]
 body:
-  # No "GitHub repo" or "repoName" fields: both are fully derivable from
-  # pluginInfo.json below (repoName is a field in the JSON itself; the repo is
-  # parsed from either pluginInfo.json's srcURL or this raw.githubusercontent.com
-  # URL) — see scan_submission.py. Asking the submitter to retype them just
-  # creates a second copy that can drift from the JSON and has to be reconciled.
+  # "GitHub repo" IS shown (below) purely so a maintainer skimming the issue sees a
+  # clickable repo link immediately, without waiting for the scan comment or parsing
+  # the raw URL by eye — but it's prefilled from the SAME repo the submitter picked on
+  # the guided page (docs/submit_new_plugin/), not re-derived from pluginInfo.json, so
+  # there's no second copy of that data to drift out of sync. It's purely informational:
+  # scan_submission.py never reads it — repoName and the real owner/repo still come
+  # only from pluginInfo.json itself (repoName is a field in the JSON; the repo is
+  # parsed from either its srcURL or the raw.githubusercontent.com pluginInfo URL
+  # below). Asking the submitter to retype either of THOSE is what was avoided —
+  # unlike this field, they'd be a second, independently-derived copy to reconcile.
+  - type: input
+    id: repo_url
+    attributes:
+      label: GitHub repo
+      description: Informational only — read from pluginInfo.json's srcURL at scan time, not from here.
+      placeholder: https://github.com/<you>/<repo>
+    validations:
+      required: false
+
   - type: input
     id: plugininfo_url
     attributes:
@@ -56,14 +70,11 @@ body:
     validations:
       required: true
 
-  - type: input
-    id: description
-    attributes:
-      label: One-line description
-      description: A single sentence describing what your plugin does.
-      placeholder: Play pre-canned announcements over the show audio with automatic ducking.
-    validations:
-      required: true
+  # No "One-line description" field: like repoName/GitHub repo above, it's fully
+  # derivable from pluginInfo.json's own `description`, and scan_submission.py never
+  # reads it from the issue body anyway — a submitter-typed copy here could never be
+  # anything but cosmetic, and would silently drift from the real value the moment
+  # pluginInfo.json changes.
 
   # No "GitHub handle" field: whoever opens this issue is logged into GitHub to do it,
   # so GitHub already records them as the reporter and auto-subscribes them to replies —

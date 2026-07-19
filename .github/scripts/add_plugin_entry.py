@@ -36,8 +36,12 @@ def load_category_map(path: str) -> dict[str, str]:
 
 
 def already_listed(text: str, repo_name: str) -> bool:
+    """Case-insensitive: repoName casing in a resubmission doesn't always match what's
+    already stored (see scan_submission.py's already_listed(), which is the primary
+    check — this is just a backstop for the rare cross-run race)."""
     data = json.loads(text)
-    return any(isinstance(e, list) and e and e[0] == repo_name for e in data.get("pluginList", []))
+    return any(isinstance(e, list) and e and e[0].lower() == repo_name.lower()
+               for e in data.get("pluginList", []))
 
 
 def insert_entry(text: str, repo_name: str, plugininfo_url: str, category: str) -> str:

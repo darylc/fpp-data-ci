@@ -138,6 +138,7 @@ jobs:
           python .github/scripts/scan_submission.py \
             --plugininfo-url "${{ steps.extract.outputs.plugininfo_url }}" \
             --schema .github/schema/pluginInfo.schema.json \
+            --plugin-list pluginList.json \
             --reporter "${{ github.event.issue.user.login }}" \
             --issue-number "${{ github.event.issue.number }}" \
             --out scan-result.json
@@ -167,29 +168,33 @@ jobs:
             const isSubmitOverride = context.eventName === 'issue_comment' &&
               context.payload.comment.body.includes('/submit');
 
-            // The issue itself no longer has a repo_url/repoName field to ask the submitter
-            // for — both are derived server-side by scan_submission.py from pluginInfo.json.
-            // Surface them here instead so anyone reading the issue still gets a clickable
-            // link and the registered owner without having to open pluginInfo.json by hand.
-            // The owner is named but NOT @-mentioned (no leading @, plain text only) — unlike
+            // repoName/repo/owner are derived server-side by scan_submission.py from
+            // pluginInfo.json (authoritative), not taken from the issue body — surfaced
+            // here as a Field: Data block so anyone reading the issue gets them at a
+            // glance, without opening pluginInfo.json or waiting to cross-reference the
+            // (informational-only, submitter-typed) "GitHub repo" issue field above.
+            // Owner is named but NOT @-mentioned (no leading @, plain text only) — unlike
             // the reporter below, they didn't ask for this notification by opening the issue,
             // so pinging them unprompted would be the same spam problem MENTION_OWNER=False
             // avoids for the campaign scanner in lib_plugin_schema.py.
-            const repoLine = result.repo_url
-              ? `**Repo:** [${result.repo_name || result.repo_url}](${result.repo_url})` +
-                (result.owner ? ` — owner: \`${result.owner}\`` : '')
-              : null;
+            const category = '${{ steps.extract.outputs.category }}';
+            const fields = [];
+            if (result.repo_name) fields.push(`**Plugin:** ${result.repo_name}`);
+            if (result.repo_url) fields.push(`**Repo:** ${result.repo_url}`);
+            if (result.owner) fields.push(`**Owner:** \`${result.owner}\``);
+            if (category) fields.push(`**Category:** ${category}`);
+            const fieldBlock = fields.length ? fields : null;
 
             let msg;
             if (result.pass) {
               msg = ['### ✅ Automated compliance scan: passed',
                      ''];
-              if (repoLine) msg.push(repoLine, '');
+              if (fieldBlock) msg.push(...fieldBlock, '');
               msg.push(`@${reporter} no blocking issues found. A maintainer will still review this by hand before it's added to \`pluginList.json\`.`);
             } else {
               msg = ['### 🛑 Automated compliance scan: needs changes',
                      ''];
-              if (repoLine) msg.push(repoLine, '');
+              if (fieldBlock) msg.push(...fieldBlock, '');
               msg.push(`@${reporter} found ${result.num_blocking} issue(s) that must be fixed before this can be merged:`,
                      '');
               for (const f of findings) {

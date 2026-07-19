@@ -34,12 +34,26 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lib_plugin_schema import (  # noqa: E402
     fetch_json,
     gh_get_repo,
+    load_pluginlist,
     parse_github_repo,
     parse_raw_github_repo,
     repo_metadata_findings,
     schema_validation_error,
 )
 from lint_plugin import lint_plugin_dir, BLOCKER, BEST_PRACTICE, OPTIONAL  # noqa: E402
+
+
+def already_listed(repo_name: str, plugin_list_path: str) -> bool:
+    """Case-insensitive: repoName casing in a resubmission doesn't always match what's
+    already stored (same reasoning as verify_remove_plugin.py's resolve_owner) — an
+    exact match would let a re-cased resubmission slip past as "new" and, later, past
+    add_plugin_entry.py's own (exact-match) already_listed() too, inserting a second,
+    case-variant entry for the same plugin."""
+    try:
+        entries = load_pluginlist(plugin_list_path)
+    except (OSError, ValueError):
+        return False
+    return any(e and e[0].lower() == repo_name.lower() for e in entries if isinstance(e, list))
 
 CLONE_TIMEOUT = 60  # seconds
 
@@ -63,6 +77,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--plugininfo-url", required=True)
     ap.add_argument("--schema", required=True)
+    ap.add_argument("--plugin-list", default="pluginList.json")
     ap.add_argument("--reporter", default=None, help="GitHub login of the issue's original reporter")
     ap.add_argument("--issue-number", default=None)
     ap.add_argument("--out", required=True)
@@ -118,9 +133,22 @@ def main():
     # fallback just keeps clone/lint working in that already-failing case too.
     repo_name = (info or {}).get("repoName") or (gh[1] if gh else None)
 
+    # --- already listed? short-circuit before the expensive clone+lint below ---
+    # Previously this was only caught much later, in add_plugin_entry.py, AFTER a
+    # full clone + lint had already run for a submission that was always going to be
+    # rejected as a duplicate — wasted work and a slower "no" for the submitter.
+    # Checking here means it shows up as a normal finding in this same comment.
+    dup_blocking = False
+    if repo_name and already_listed(repo_name, args.plugin_list):
+        findings.append((BLOCKER, "already-listed",
+                          f"`{repo_name}` is already in pluginList.json — nothing to do here."))
+        dup_blocking = True
+
     # --- clone + static lint --------------------------------------------------
     linted = False
-    if gh:
+    if dup_blocking:
+        pass
+    elif gh:
         owner, repo = gh
         with tempfile.TemporaryDirectory() as tmp:
             dest = os.path.join(tmp, repo)

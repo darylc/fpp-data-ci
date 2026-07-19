@@ -54,7 +54,7 @@
 # reporter - see the "Restrict..." step below. Anyone else gets told to open
 # their own request instead of being able to act on someone else's.
 
-name: Verify plugin removal ownership
+name: Automation - Verify plugin removal ownership
 
 on:
   issues:

@@ -218,13 +218,36 @@ jobs:
                   if (seen.length >= 5) break;
                 }
                 if (seen.length) {
-                  committerNote = `\n\nRecent committers to this repo who may be able to help: ${seen.map(l => `\`${l}\``).join(', ')}.`;
+                  const names = seen.map(l => `\`${l}\``).join(', ');
+                  committerNote = `\n\n${names} - please take a look.`;
                 }
               } catch (e) { /* best-effort only - don't fail the recheck over this */ }
 
+              // Still doesn't declare FPP {target} support at all (not just "has
+              // blockers") - reiterate the plugin's own maintainer/candidates (same
+              // mention-not-@-mention rendering as the issue body's "Maintainer:"
+              // line) and ask again whether they'd rather delist, plus offer /recheck.
+              let stillNotCompatNote = '';
+              if (!r.certified) {
+                let pluginMaintainer;
+                if (r.owner_is_org) {
+                  pluginMaintainer = r.maintainer_candidates && r.maintainer_candidates.length
+                    ? `\`${r.owner}\` org (candidate contributors, access not verified: ${r.maintainer_candidates.map(c => `\`${c}\``).join(', ')})`
+                    : `\`${r.owner}\` org (no individual maintainer identified)`;
+                } else if (r.owner) {
+                  pluginMaintainer = `\`${r.owner}\``;
+                } else {
+                  pluginMaintainer = 'unknown maintainer';
+                }
+                stillNotCompatNote = `\n\n${pluginMaintainer} - \`${pluginName}\` still doesn't declare FPP ` +
+                  `${target} support. Would you prefer to delist this plugin instead? Submit a removal ` +
+                  `request at https://darylc.github.io/fpp-data-ci/submit_remove_plugin/, or comment ` +
+                  `\`/recheck\` after adding FPP ${target} support to re-run this check.`;
+              }
+
               await github.rest.issues.createComment({ owner, repo, issue_number,
                 body: `Rechecked (${summary}) - flagged for manual review at the owner's request via ` +
-                      `\`/submit\`. Reason given:${quoted}${committerNote}` });
+                      `\`/submit\`. Reason given:${quoted}${committerNote}${stillNotCompatNote}` });
             } else if (r.certified && r.num_blocker > 0) {
               await github.rest.issues.createComment({ owner, repo, issue_number,
                 body: `Rechecked - declares FPP ${target} compatibility, but still has ${r.num_blocker} ` +

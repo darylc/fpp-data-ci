@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Request Plugin Removal — Falcon Player</title>
+<title>Request Plugin Removal - Falcon Player</title>
 <style>
   :root { color-scheme: light dark; --fg:#1a1a1a; --bg:#fff; --muted:#5a5a5a;
           --line:#d8d8d8; --accent:#0969da; --ok:#1a7f37; --err:#cf222e; --code:#f6f8fa; }
@@ -70,13 +70,13 @@
       <li><strong>If you're the author</strong>, ownership is checked automatically
           (it compares your GitHub login against the plugin repo's owner). If it can't
           confirm that directly (e.g. an org-owned repo), it'll ask you to add
-          <code>"delist": true</code> to your <code>pluginInfo.json</code> as proof —
+          <code>"delist": true</code> to your <code>pluginInfo.json</code> as proof -
           only someone with write access could do that.</li>
       <li><strong>If you're a third party</strong> reporting an abandoned plugin, it's
-          never removed automatically — the actual owner gets a chance to respond
+          never removed automatically - the actual owner gets a chance to respond
           first, and a maintainer reviews it if there's no resolution.</li>
       <li>Once ownership is confirmed, the entry is removed from
-          <code>pluginList.json</code> and the issue is closed automatically —
+          <code>pluginList.json</code> and the issue is closed automatically -
           no maintainer wait needed for a verified request.</li>
     </ol>
   </div>
@@ -93,22 +93,22 @@
 </main>
 
 <script>
-// SANDBOX VALUE — swap to FalconChristmas/fpp-data when promoting upstream.
+// SANDBOX VALUE - swap to FalconChristmas/fpp-data when promoting upstream.
 const REPO = "darylc/fpp-data-ci";
 const TEMPLATE = "submit_remove_plugin.yml";
 
 const $ = (id) => document.getElementById(id);
 const setMsg = (el, text, cls) => { el.textContent = text; el.className = "msg" + (cls ? " " + cls : ""); };
 
-// No encryption step here (unlike submit_new_plugin/) — this form never collects an
+// No encryption step here (unlike submit_new_plugin/) - this form never collects an
 // email, so there's nothing to protect client-side. reporterType and reason are
 // dropdowns and can't be prefilled at all (GitHub Issue Forms hard limitation, same
-// as Category on the submission page) — only repoName carries over; the rest is
+// as Category on the submission page) - only repoName carries over; the rest is
 // picked directly on the real form.
 
 // Same input shapes submit_new_plugin/ accepts (full github.com or
 // raw.githubusercontent.com URL, or bare owner/repo), except an owner isn't required
-// here — removal only needs the plugin's repoName text, not a resolvable owner for
+// here - removal only needs the plugin's repoName text, not a resolvable owner for
 // API calls, so a bare repo name with no slash at all is also accepted as-is.
 // Mirrors lib_plugin_schema.py's resolve_repo_name(), which does the authoritative
 // version of this same extraction server-side.
@@ -125,7 +125,7 @@ function go() {
   if (!repoName) return setMsg(msg, "Please enter your plugin's repoName or repo URL.", "err");
 
   // Title should show the bare repoName even if a full URL (or owner/repo shorthand)
-  // was pasted — "[Remove plugin request] https://github.com/owner/repo" would look
+  // was pasted - "[Remove plugin request] https://github.com/owner/repo" would look
   // wrong in the issue list. The repoName FIELD sent below stays the raw text as
   // typed; remove-plugin-verify.yml's resolve_repo_name() does its own authoritative
   // extraction from that server-side, this is purely a display nicety.

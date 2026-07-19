@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Submit a plugin — Falcon Player</title>
+<title>Submit a plugin - Falcon Player</title>
 <style>
   :root { color-scheme: light dark; --fg:#1a1a1a; --bg:#fff; --muted:#5a5a5a;
           --line:#d8d8d8; --accent:#0969da; --ok:#1a7f37; --err:#cf222e; --code:#f6f8fa; }
@@ -70,7 +70,7 @@
 
   <p class="note">
     Your <strong>email is encrypted in this page, in your browser</strong>, before it goes anywhere.
-    Only FPP maintainers can read it — it never appears publicly on the GitHub issue.
+    Only FPP maintainers can read it - it never appears publicly on the GitHub issue.
     Everything else you enter here is public, as it's part of the plugin listing.
   </p>
 
@@ -83,9 +83,9 @@
           on the issue: one confirms your contact token is well-formed, the other clones your
           repo and runs a check on your plugin. If it finds any issues it will let you know.</li>
       <li><strong>If the scan asks for changes</strong>, push a fix to your repo, then comment
-          <code>/recheck</code> on the issue to re-run it — no need to edit the issue itself.</li>
-      <li><strong>Once the checks pass, a maintainer still reviews it by hand</strong> —
-          category fit, description wording, and anything the automation can't judge — before
+          <code>/recheck</code> on the issue to re-run it - no need to edit the issue itself.</li>
+      <li><strong>Once the checks pass, a maintainer still reviews it by hand</strong> -
+          category fit, description wording, and anything the automation can't judge - before
           opening a pull request that adds your plugin to <code>pluginList.json</code>.</li>
       <li><strong>Once that PR merges</strong>, your plugin appears in everyone's Plugin
           Manager straight away.</li>
@@ -95,26 +95,25 @@
   <fieldset>
     <legend>Your plugin</legend>
 
-    <label for="repo_url">Your plugin's GitHub repo
-      <span class="hint">— paste the repo URL, its pluginInfo.json URL, or owner/repo; we'll figure out the rest</span></label>
-    <input id="repo_url" type="text" autocomplete="off" spellcheck="false" placeholder="github.com/you/fpp-AnnouncementAssistant">
+    <label for="repo_url">Your plugin's GitHub repo</label>
+    <input id="repo_url" type="text" autocomplete="off" spellcheck="false" placeholder="you/fpp-AnnouncementAssistant">
     <div id="fetchMsg" class="msg hint"></div>
 
     <label for="email">Contact email
-      <span class="hint">— encrypted here; visible only to FPP maintainers</span></label>
+      <span class="hint">- encrypted here; visible only to FPP maintainers</span></label>
     <input id="email" type="email" autocomplete="off" spellcheck="false" placeholder="you@example.com">
 
     <button id="go">Encrypt &amp; continue</button>
     <div id="msg" class="msg"></div>
 
     <!-- Hidden, not asked here: category can't be carried over at all (GitHub Issue
-         Forms cannot prefill dropdown fields, full stop — see generate() below).
+         Forms cannot prefill dropdown fields, full stop - see generate() below).
          plugininfo_url is auto-read from your repo's pluginInfo.json when possible
          and sent on to the issue as its own PUBLIC_FIELD (below); if it isn't known
          it lands blank there and you fill it in on GitHub directly.
          display_name and repo_name are read from pluginInfo.json too, but ONLY used
          locally here (issue title + the token payload's repo binding + a sanity
-         check that a repoName was found at all) — the issue form itself doesn't ask
+         check that a repoName was found at all) - the issue form itself doesn't ask
          for either, since scan_submission.py derives both straight from
          pluginInfo.json server-side and a submitter-typed copy would just be a
          second, driftable source of truth for the same data. -->
@@ -143,11 +142,11 @@
 <script>
 // ---------------------------------------------------------------------------
 // CONFIG
-// SANDBOX VALUES — swap REPO to FalconChristmas/fpp-data when promoting upstream.
+// SANDBOX VALUES - swap REPO to FalconChristmas/fpp-data when promoting upstream.
 const REPO = "darylc/fpp-data-ci";
 const TEMPLATE = "plugin-submission.yml";
 
-// Public key — safe to publish. The private key exists only as an Actions secret on
+// Public key - safe to publish. The private key exists only as an Actions secret on
 // FPP's private contacts repo, so only maintainers can decrypt.
 const PUBLIC_JWK = {
   "kty": "RSA",
@@ -162,7 +161,7 @@ const PUBLIC_JWK = {
 
 // Category is deliberately NOT handled on this page at all: GitHub Issue Forms cannot
 // prefill a `dropdown`-type field via query parameters under any circumstances (only
-// input/textarea fields support that) — confirmed platform limitation, not something a
+// input/textarea fields support that) - confirmed platform limitation, not something a
 // value-matching fix can work around. The submitter picks Category on the real GitHub
 // form instead, where its dropdown works normally.
 // ---------------------------------------------------------------------------
@@ -173,7 +172,7 @@ const setMsg = (el, text, cls) => { el.textContent = text; el.className = "msg" 
 
 // Best-effort auto-fill of display_name/repo_name/plugininfo_url/description from the
 // repo's own pluginInfo.json, so the submitter mostly doesn't have to retype what their
-// repo already says. These fields are hidden on THIS page (not shown for review here) —
+// repo already says. These fields are hidden on THIS page (not shown for review here) -
 // they still land on the next page's normal, editable inputs, so anything missing or
 // wrong (no pluginInfo.json yet, private repo, wrong branch, ...) just arrives blank
 // there and gets filled in / corrected on GitHub directly, same as Category.
@@ -183,7 +182,7 @@ async function deriveFromRepo() {
   if (!raw) return null;
 
   // Accepts github.com/owner/repo, raw.githubusercontent.com/owner/repo(/branch/pluginInfo.json...),
-  // or bare owner/repo — anything after the repo segment (branch, file path, .git) is ignored.
+  // or bare owner/repo - anything after the repo segment (branch, file path, .git) is ignored.
   const m = raw.match(/^(?:https?:\/\/)?(?:www\.)?(?:github\.com|raw\.githubusercontent\.com)\/([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?(?:\/.*)?$/)
          || raw.match(/^([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?$/);
   if (!m) {
@@ -193,13 +192,13 @@ async function deriveFromRepo() {
   const [, owner, repo] = m;
   $("repo_name").value = repo;   // fallback so the contact token can still bind to a repo below
   // Normalize to a full URL (not "owner/repo" shorthand) so it renders as a clickable
-  // link once it lands in the issue body — GitHub auto-links bare URLs, not shorthand.
+  // link once it lands in the issue body - GitHub auto-links bare URLs, not shorthand.
   $("repo_url").value = `https://github.com/${owner}/${repo}`;
 
   setMsg(fetchMsg, "Looking up repo…", "");
   try {
     const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
-    if (!repoRes.ok) throw new Error(`repo lookup failed (HTTP ${repoRes.status}) — is it public?`);
+    if (!repoRes.ok) throw new Error(`repo lookup failed (HTTP ${repoRes.status}) - is it public?`);
     const branch = (await repoRes.json()).default_branch || "main";
 
     const infoUrl = `https://raw.githubusercontent.com/${owner}/${repo}/refs/heads/${branch}/pluginInfo.json`;
@@ -212,7 +211,7 @@ async function deriveFromRepo() {
     if (info.name) $("display_name").value = info.name;
     $("repo_name").value = info.repoName || repo;
 
-    setMsg(fetchMsg, "Read pluginInfo.json — you'll confirm the details on the next page.", "ok");
+    setMsg(fetchMsg, "Read pluginInfo.json - you'll confirm the details on the next page.", "ok");
   } catch (e) {
     setMsg(fetchMsg, `Couldn't read pluginInfo.json (${e.message}). You'll fill those fields in on the next page.`, "");
   }
@@ -228,7 +227,7 @@ function b64(bytes) {
 const wrap = (s) => s.replace(/(.{72})/g, "$1\n").trim();
 
 // Fields that go straight onto the public issue, mapped to the form's field ids.
-// repo_url IS forwarded (informational only, see plugin-submission.yml) — it's
+// repo_url IS forwarded (informational only, see plugin-submission.yml) - it's
 // exactly what the submitter typed on this page, not an independently-derived copy
 // of anything, so there's nothing for it to drift out of sync with.
 // display_name and repo_name are still deliberately NOT here: the issue form has no
@@ -254,7 +253,7 @@ async function generate() {
   const repoName = $("repo_name").value.trim();
   const displayName = $("display_name").value.trim();
   if (!/^[A-Za-z0-9._-]+$/.test(repoName))
-    return setMsg(msg, "Couldn't work out a repoName from that repo — check the URL and try again.", "err");
+    return setMsg(msg, "Couldn't work out a repoName from that repo - check the URL and try again.", "err");
 
   const v = Object.fromEntries(PUBLIC_FIELDS.map(f => [f, $(f).value.trim()]));
 
@@ -271,7 +270,7 @@ async function generate() {
     const token = PREFIX + "\n" + wrap(b64(ct));
 
     // Issue Forms prefill from query params keyed by field id. Checkboxes can't be
-    // prefilled — the acknowledgements stay on GitHub, ticked deliberately. `title` is
+    // prefilled - the acknowledgements stay on GitHub, ticked deliberately. `title` is
     // a special top-level param (not a field id) that overrides the template's default
     // "do not edit this title" placeholder with the actual plugin name.
     const qs = new URLSearchParams({
@@ -296,7 +295,7 @@ async function generate() {
 $("go").addEventListener("click", generate);
 
 if (!crypto?.subtle) {
-  setMsg($("msg"), "This browser can't encrypt here (needs a secure context — open this page over https).", "err");
+  setMsg($("msg"), "This browser can't encrypt here (needs a secure context - open this page over https).", "err");
   $("go").disabled = true;
 }
 </script>

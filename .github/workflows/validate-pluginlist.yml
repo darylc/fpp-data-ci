@@ -8,7 +8,7 @@
 # The validator only hard-checks NEW/CHANGED entries (it diffs against the base branch),
 # so a PR isn't blocked by a pre-existing issue elsewhere in the list.
 
-name: Automation - Validate pluginList
+name: ZZ - Automation - Validate pluginList
 
 on:
   pull_request:

@@ -9,7 +9,7 @@
 # Runs the campaign scanner in metadata-only mode (no --plugins-dir), so it's fast.
 # TARGET_MAJOR comes from the repo variable CAMPAIGN_TARGET_MAJOR (default 10).
 
-name: Automation - Daily FPP compatibility check
+name: ZZ - Automation - Daily FPP compatibility check
 
 on:
   schedule:

@@ -13,7 +13,7 @@
 # Runs on the PUBLIC repo, so it holds NO decryption key and cannot read any email. It only
 # looks at the SHAPE of the token.
 
-name: Automation - Check submission token
+name: ZZ - Automation - Check submission token
 
 on:
   issues:

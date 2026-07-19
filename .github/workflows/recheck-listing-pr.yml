@@ -23,7 +23,7 @@
 # author" the way issues do -- this PR was opened by github-actions[bot]) or a
 # fpp-data-ci maintainer (push/maintain/admin), nobody else.
 
-name: Automation - Recheck listing PR
+name: ZZ - Automation - Recheck listing PR
 
 on:
   issue_comment:

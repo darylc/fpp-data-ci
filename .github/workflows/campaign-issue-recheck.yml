@@ -16,7 +16,7 @@
 # throughout this repo's CI (see check-submission-token.yml) rather than a label,
 # since GitHub silently drops template labels that don't exist on the repo.
 
-name: Automation - Recheck campaign tracking issue
+name: ZZ - Automation - Recheck campaign tracking issue
 
 on:
   issue_comment:

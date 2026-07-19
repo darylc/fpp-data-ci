@@ -43,7 +43,7 @@
 # see the "Restrict..." step below. Anyone else gets told to open their own submission
 # instead of being able to act on someone else's.
 
-name: Automation - Scan new plugin submission
+name: ZZ - Automation - Scan new plugin submission
 
 on:
   issues:

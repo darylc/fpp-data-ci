@@ -30,7 +30,7 @@
 # python invocation below uses execFileSync with an argument array, never a shell
 # string built by interpolating repoName, to avoid command injection.
 
-name: Automation - Removal escalation sweep
+name: ZZ - Automation - Removal escalation sweep
 
 on:
   schedule:

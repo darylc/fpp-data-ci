@@ -72,6 +72,26 @@
     Everything else you enter here is public, as it's part of the plugin listing.
   </p>
 
+  <details open>
+    <summary>What happens after I submit?</summary>
+    <ol style="padding-left:1.2rem">
+      <li><strong>The issue is opened under your GitHub account</strong>, so you're notified
+          automatically on any reply — no one needs to @-mention you.</li>
+      <li><strong>Two automated checks run within a minute or two</strong> and comment directly
+          on the issue: one confirms your contact token is well-formed, the other clones your
+          repo and runs the same compliance linter used for already-listed plugins — but a
+          little stricter, since a new plugin doesn't get the grandfathering an existing one
+          has. If it finds anything blocking, the comment tells you exactly what and where.</li>
+      <li><strong>If the scan asks for changes</strong>, push a fix to your repo, then comment
+          <code>/recheck</code> on the issue to re-run it — no need to edit the issue itself.</li>
+      <li><strong>Once the checks pass, a maintainer still reviews it by hand</strong> —
+          category fit, description wording, and anything the automation can't judge — before
+          opening a pull request that adds your plugin to <code>pluginList.json</code>.</li>
+      <li><strong>Once that PR merges</strong>, your plugin appears in everyone's Plugin
+          Manager the next time FPP refreshes its list.</li>
+    </ol>
+  </details>
+
   <fieldset>
     <legend>Your plugin</legend>
 
@@ -121,26 +141,6 @@
       <textarea id="tokenOut" readonly spellcheck="false"></textarea>
     </details>
   </fieldset>
-
-  <details>
-    <summary>What happens after I submit?</summary>
-    <ol style="padding-left:1.2rem">
-      <li><strong>The issue is opened under your GitHub account</strong>, so you're notified
-          automatically on any reply — no one needs to @-mention you.</li>
-      <li><strong>Two automated checks run within a minute or two</strong> and comment directly
-          on the issue: one confirms your contact token is well-formed, the other clones your
-          repo and runs the same compliance linter used for already-listed plugins — but a
-          little stricter, since a new plugin doesn't get the grandfathering an existing one
-          has. If it finds anything blocking, the comment tells you exactly what and where.</li>
-      <li><strong>If the scan asks for changes</strong>, push a fix to your repo, then comment
-          <code>/recheck</code> on the issue to re-run it — no need to edit the issue itself.</li>
-      <li><strong>Once the checks pass, a maintainer still reviews it by hand</strong> —
-          category fit, description wording, and anything the automation can't judge — before
-          opening a pull request that adds your plugin to <code>pluginList.json</code>.</li>
-      <li><strong>Once that PR merges</strong>, your plugin appears in everyone's Plugin
-          Manager the next time FPP refreshes its list.</li>
-    </ol>
-  </details>
 </main>
 
 <script>

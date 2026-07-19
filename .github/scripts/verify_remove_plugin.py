@@ -11,7 +11,15 @@ Verdicts:
                our CI their write access, so ask for proof-of-control:
                set `"delist": true` in the plugin's pluginInfo.json (only someone
                with write access can), which also becomes the machine signal.
-  error      — couldn't resolve the plugin / repo.
+  not_found  — the named repoName isn't in pluginList.json at all. There's no
+               listing to remove, so this is auto-closed rather than left for a
+               maintainer (see the workflow's "Auto-close: not listed" step).
+  error      — couldn't resolve the plugin / repo for some other reason. Two
+               flavors: a transient one (couldn't fetch the listed
+               pluginInfo.json right now — network blip, rate limit) that
+               just needs a `/recheck` later and doesn't need a maintainer at
+               all; and a structural one (can't determine owner/repo from the
+               listing at all) that does.
 
 Reads ISSUE_AUTHOR and ISSUE_BODY from the environment. Writes a Markdown comment
 to --output and the verdict label to $GITHUB_OUTPUT (key `verdict`).
@@ -39,20 +47,31 @@ def field(body: str, label: str) -> str:
 
 
 def resolve_owner(repo_name: str, plugin_list_path: str, token):
-    """(owner, repo, archived_or_missing, delist_flag, error) for a listed plugin.
+    """(owner, repo, archived_or_missing, delist_flag, error, not_found, transient) for a listed plugin.
+
+    `transient` marks the one failure mode that's worth telling the reporter to
+    just `/recheck` later instead of waiting on a maintainer: the listed
+    pluginInfo.json URL didn't fetch. That's a network/rate-limit blip as often
+    as a real dead link, and either way the fix is the same non-human action —
+    try again.
 
     Matches case-insensitively: GitHub repo names are case-insensitive in URLs,
     but a plugin's declared repoName (what pluginList.json stores) doesn't
     always match its repo's URL casing byte-for-byte (e.g. "fpp-PulseMesh" vs.
     the repo slug "fpp-pulsemesh") -- an exact match would wrongly report a
     listed plugin as not found.
+
+    `not_found` is split out from the other error cases: it means the repoName
+    genuinely isn't listed (nothing to remove), vs. a listed entry we merely
+    failed to resolve (network/data problem) — callers auto-close the former
+    and leave the latter for a maintainer.
     """
     for entry in lib.load_pluginlist(plugin_list_path):
         if entry and entry[0].lower() == repo_name.lower():
             info_url = entry[1] if len(entry) > 1 else ""
             info, err = lib.fetch_json(info_url)
             if err:
-                return None, None, False, False, f"couldn't fetch pluginInfo.json: {err}"
+                return None, None, False, False, f"couldn't fetch pluginInfo.json: {err}", False, True
             info = info or {}
             # Proof-of-control: an author with write access set delist:true in their
             # OWN pluginInfo.json ("delist" is pluginInfo.schema.json's actual field
@@ -60,17 +79,24 @@ def resolve_owner(repo_name: str, plugin_list_path: str, token):
             # it proves control even for an org repo — and it doubles as the
             # machine-readable removal signal.
             delist = bool(info.get("delist"))
-            src = lib.parse_github_repo(info.get("srcURL", "") or "")
+            # owner/repo primarily from pluginList.json's OWN infoURL (entry[1]),
+            # not pluginInfo.json's self-declared srcURL: we just fetched `info`
+            # from that URL successfully, so it's a raw.githubusercontent.com/
+            # {owner}/{repo}/... link we already trust — no dependency on the
+            # plugin author having filled in srcURL correctly. srcURL is only a
+            # fallback for the rare case pluginInfo.json is hosted somewhere
+            # parse_raw_github_repo can't parse (custom domain, etc.).
+            src = lib.parse_raw_github_repo(info_url) or lib.parse_github_repo(info.get("srcURL", "") or "")
             if not src:
-                return None, None, False, delist, "srcURL is missing or not a github.com URL"
+                return None, None, False, delist, "couldn't determine the plugin's GitHub owner/repo from its listing", False, False
             owner, repo = src
             data, gherr = lib.gh_get_repo(owner, repo, token)
             # Only "gone" on a definitive 404 or explicit archived flag — NOT on a
             # transient error (rate limit / network), which would falsely verify.
             missing = data is None and bool(gherr) and "404" in gherr
             archived = bool(data and data.get("archived"))
-            return owner, repo, (missing or archived), delist, None
-    return None, None, False, False, f"'{repo_name}' is not in pluginList.json"
+            return owner, repo, (missing or archived), delist, None, False, False
+    return None, None, False, False, f"'{repo_name}' is not in pluginList.json", True, False
 
 
 def main():
@@ -91,8 +117,16 @@ def main():
     if not repo_name:
         verdict, msg = "error", "Could not read a **Plugin repoName** from the form."
     elif is_third_party:
-        owner, repo, gone, delist, err = resolve_owner(repo_name, args.plugin_list, token)
-        if err:
+        owner, repo, gone, delist, err, not_found, transient = resolve_owner(repo_name, args.plugin_list, token)
+        if not_found:
+            verdict, msg = "not_found", (
+                f"`{repo_name}` is not currently listed in `pluginList.json`, so there's nothing "
+                f"to remove.")
+        elif transient:
+            verdict, msg = "error", (
+                f"Could not resolve `{repo_name}` for this report right now: {err}\n\n"
+                f"This is likely transient — comment `/recheck` in a bit and we'll try again.")
+        elif err:
             verdict, msg = "error", f"Could not resolve `{repo_name}` for this report: {err}"
         elif delist or gone:
             # Owner already proved control (or the repo's gone) -- no need to wait
@@ -112,8 +146,17 @@ def main():
                 f"in a comment here. If there's no response within 7 days, this will be flagged for "
                 f"the FPP team to review manually.")
     else:
-        owner, repo, gone, delist, err = resolve_owner(repo_name, args.plugin_list, token)
-        if err:
+        owner, repo, gone, delist, err, not_found, transient = resolve_owner(repo_name, args.plugin_list, token)
+        if not_found:
+            verdict, msg = "not_found", (
+                f"`{repo_name}` is not currently listed in `pluginList.json`, so there's nothing "
+                f"to remove.")
+        elif transient:
+            verdict, msg = "error", (
+                f"Could not verify `{repo_name}` right now: {err}\n\n"
+                f"This is likely transient — comment `/recheck` in a bit and we'll try again. No "
+                f"need to open a new issue.")
+        elif err:
             verdict, msg = "error", (
                 f"Could not verify `{repo_name}`: {err}\n\n"
                 f"Fixed the repoName (typo, casing, etc.)? Edit this issue's description with the "

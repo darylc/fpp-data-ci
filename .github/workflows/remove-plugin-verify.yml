@@ -5,11 +5,18 @@
 # repo owner (from srcURL) and posts a sticky comment + a verdict label:
 #   owner-verified        submitter owns the repo (or it's archived/gone)
 #   ownership-unconfirmed  org repo → asks for proof (delist:true), or /submit to override
-#   removal-error          couldn't resolve the plugin
+#   not-listed              repoName isn't in pluginList.json at all — nothing to remove
+#   removal-error          couldn't resolve the plugin for some other reason
 #
 # On `owner-verified` it goes straight on to remove the entry from
 # pluginList.json, commit it, and close the issue — no PR/review gate, since
 # ownership is already established by that point.
+#
+# On `not-listed` there is by definition no listing to act on (see
+# verify_remove_plugin.py's `not_found` verdict), so the "Auto-close: not
+# listed" step below tags the reporter, points them at the new-listing form,
+# and closes the issue immediately — same as `owner-verified`, just skipping
+# the removal step since there's nothing in pluginList.json to remove.
 #
 # WHY ONE WORKFLOW, NOT TWO: this used to be two workflows, with a second
 # "Apply verified removal" triggered by the `owner-verified` label being added.
@@ -57,8 +64,12 @@ permissions:
 jobs:
   verify:
     # Only for plugin-removal requests (the form applies this label), and for a
-    # comment trigger, only when it's actually /recheck or /submit -- otherwise
-    # every comment on a removal-request issue would re-run this.
+    # comment trigger, only when the body *contains* /recheck or /submit --
+    # this is a coarse pre-filter to avoid running the job on unrelated
+    # comments; it's a plain substring match, so it also matches things like
+    # a URL ending in `/submit_remove_plugin/`. The "Restrict..." step below
+    # does the precise, word-boundary command match that actually decides
+    # whether a real command was used.
     if: >-
       contains(github.event.issue.labels.*.name, 'removal-request') &&
       (github.event_name != 'issue_comment' ||
@@ -76,7 +87,18 @@ jobs:
               core.setOutput('command', '');
               return;
             }
-            const commandUsed = context.payload.comment.body.includes('/submit') ? 'submit' : 'recheck';
+            const body = context.payload.comment.body;
+            // Word-boundary match, not substring: the job-level `contains()`
+            // filter above is coarse and also matches a URL like
+            // `.../submit_remove_plugin/`. This is the real command parse.
+            const isSubmit = /(?:^|\s)\/submit(?:\s|$)/.test(body);
+            const isRecheck = /(?:^|\s)\/recheck(?:\s|$)/.test(body);
+            if (!isSubmit && !isRecheck) {
+              core.setOutput('ok', 'false');
+              core.setOutput('command', '');
+              return;
+            }
+            const commandUsed = isSubmit ? 'submit' : 'recheck';
             core.setOutput('command', commandUsed);
 
             const commenter = context.payload.comment.user.login;
@@ -141,9 +163,9 @@ jobs:
               await github.rest.issues.createComment({owner, repo, issue_number, body});
             }
 
-            // verdict label (swap the three, keep whatever else is there)
+            // verdict label (swap the five, keep whatever else is there)
             const verdict = '${{ steps.verify.outputs.verdict }}';
-            const map = {verified: 'owner-verified', unconfirmed: 'ownership-unconfirmed', error: 'removal-error', report: 'removal-report'};
+            const map = {verified: 'owner-verified', unconfirmed: 'ownership-unconfirmed', not_found: 'not-listed', error: 'removal-error', report: 'removal-report'};
             const want = map[verdict];
             for (const l of Object.values(map)) {
               if (l !== want) {
@@ -165,6 +187,30 @@ jobs:
             await github.rest.issues.createComment({owner, repo, issue_number,
               body: 'Flagged for manual review — the reporter used `/submit` to ask a maintainer to ' +
                     'decide despite automated ownership verification not confirming this directly.'});
+
+      - name: "Auto-close: not listed"
+        if: >-
+          steps.authz.outputs.ok == 'true' && steps.verify.outputs.verdict == 'not_found' &&
+          steps.authz.outputs.command != 'submit'
+        uses: actions/github-script@v7
+        env:
+          REPO_NAME: ${{ steps.verify.outputs.repo_name }}
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const issue_number = context.issue.number;
+            const author = context.payload.issue.user.login;
+            const repoName = process.env.REPO_NAME;
+            await github.rest.issues.createComment({owner, repo, issue_number,
+              body: `@${author} Thanks for the report. \`${repoName}\` isn't currently in our ` +
+                    `plugin listing (\`pluginList.json\`), so there's nothing to remove here — the ` +
+                    `automated check above confirms it can't find a matching entry.\n\n` +
+                    `If you believe this plugin *should* be listed (or you meant a different/renamed ` +
+                    `repo), please submit a new listing request via the guided form: ` +
+                    `https://darylc.github.io/fpp-data-ci/submit_remove_plugin/\n\n` +
+                    `Closing this one out since there's no existing listing to act on. If this is ` +
+                    `wrong, comment \`/submit\` and we'll flag it for a maintainer instead.`});
+            await github.rest.issues.update({owner, repo, issue_number, state: 'closed'});
 
       # --- from here on: only for a verified removal ---------------------------
 

@@ -17,7 +17,7 @@
         "maxItems": 3,
         "prefixItems": [
           { "type": "string", "minLength": 1, "description": "Display/repo name (used as the entry key)." },
-          { "type": "string", "pattern": "^https?://", "description": "Raw URL to the plugin's pluginInfo.json." },
+          { "type": "string", "pattern": "^https://raw\\.githubusercontent\\.com/", "description": "Raw URL to the plugin's pluginInfo.json. Must be hosted on GitHub — that's the only source FPP plugins support." },
           { "type": "string", "minLength": 1, "description": "Category short name (must exist in pluginCategories.json)." }
         ],
         "items": { "type": "string" }

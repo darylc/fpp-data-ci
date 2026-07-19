@@ -37,9 +37,9 @@
     },
     "srcURL": {
       "type": "string",
-      "description": "The URL FPP clones from at install time (this is the trust anchor for the Official badge).",
+      "description": "The URL FPP clones from at install time (this is the trust anchor for the Official badge). Must be a github.com repo — that's the only source FPP plugins support.",
       "format": "uri",
-      "pattern": "^https?://"
+      "pattern": "^https://(www\\.)?github\\.com/"
     },
     "bugURL": {
       "type": "string",

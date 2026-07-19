@@ -202,6 +202,7 @@ def scan_plugin(entry, target, plugins_dir, token, schema):
         "maintainer_candidates": maintainer_candidates,
         "status": status,
         "certified": certified,
+        "last_major": last_major,
         # certified only means "declares a versions[] entry for the target major" -
         # it says nothing about outstanding BLOCKER findings (schema errors, lint
         # failures, etc). ready_to_close is the actual gate for auto-closing a

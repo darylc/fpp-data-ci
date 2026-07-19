@@ -18,25 +18,14 @@ description: Do not open this directly — use the guided submission page instea
 title: "[New Plugin Submission - do not edit this title]"
 labels: ["plugin", "submission"]
 body:
-  # "GitHub repo" IS shown (below) purely so a maintainer skimming the issue sees a
-  # clickable repo link immediately, without waiting for the scan comment or parsing
-  # the raw URL by eye — but it's prefilled from the SAME repo the submitter picked on
-  # the guided page (docs/submit_new_plugin/), not re-derived from pluginInfo.json, so
-  # there's no second copy of that data to drift out of sync. It's purely informational:
-  # scan_submission.py never reads it — repoName and the real owner/repo still come
-  # only from pluginInfo.json itself (repoName is a field in the JSON; the repo is
-  # parsed from either its srcURL or the raw.githubusercontent.com pluginInfo URL
-  # below). Asking the submitter to retype either of THOSE is what was avoided —
-  # unlike this field, they'd be a second, independently-derived copy to reconcile.
-  - type: input
-    id: repo_url
-    attributes:
-      label: GitHub repo
-      description: Informational only — read from pluginInfo.json's srcURL at scan time, not from here.
-      placeholder: https://github.com/<you>/<repo>
-    validations:
-      required: false
-
+  # No "GitHub repo" field: a prior version of this form had one, purely so a
+  # maintainer skimming the issue would see a clickable repo link immediately. But an
+  # editable field a submitter can freely change and that scan_submission.py never
+  # reads is misleading — it invites editing that has zero effect (nothing here can be
+  # "fixed" or "corrected" by typing into it). The repo link is instead surfaced in the
+  # bot's own scan-result comment (a Field:/Data block, posted within a minute or two),
+  # which IS derived authoritatively from pluginInfo.json — same reasoning as
+  # repoName/description below, just realized one field later.
   - type: input
     id: plugininfo_url
     attributes:

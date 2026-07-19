@@ -68,6 +68,13 @@
     New plugins need to pass certain checks prior to being listed.
   </p>
 
+  <p>
+    Please read the
+    <!-- SANDBOX URL — swap to https://github.com/FalconChristmas/fpp-data/blob/master/CONTRIBUTING.md upstream. -->
+    <a href="https://github.com/darylc/fpp-data-ci/blob/master/CONTRIBUTING.md" target="_blank" rel="noopener">plugin guidelines</a>
+    before submitting — they cover what's required for a listing to be accepted.
+  </p>
+
   <p class="note">
     Your <strong>email is encrypted in this page, in your browser</strong>, before it goes anywhere.
     Only FPP maintainers can read it - it never appears publicly on the GitHub issue.
@@ -227,15 +234,15 @@ function b64(bytes) {
 const wrap = (s) => s.replace(/(.{72})/g, "$1\n").trim();
 
 // Fields that go straight onto the public issue, mapped to the form's field ids.
-// repo_url IS forwarded (informational only, see plugin-submission.yml) - it's
-// exactly what the submitter typed on this page, not an independently-derived copy
-// of anything, so there's nothing for it to drift out of sync with.
-// display_name and repo_name are still deliberately NOT here: the issue form has no
-// matching fields for those (scan_submission.py derives repoName and the real
-// owner/repo from pluginInfo.json server-side, rather than trusting a submitter-typed
-// copy), so sending them as query params would just be prefilling fields that don't
-// exist. They're still used locally below (title, token payload, sanity check).
-const PUBLIC_FIELDS = ["plugininfo_url", "repo_url"];
+// repo_url, display_name, and repo_name are deliberately NOT here even though this
+// page reads/derives all three: the issue form has no matching fields for them
+// (scan_submission.py derives repoName and the real owner/repo from pluginInfo.json
+// server-side, rather than trusting a submitter-typed copy — and a prior "GitHub repo"
+// field that was purely cosmetic got removed for the same reason, see
+// plugin-submission.yml), so sending them as query params would just be prefilling
+// fields that don't exist. They're still used locally below (title, token payload,
+// sanity check).
+const PUBLIC_FIELDS = ["plugininfo_url"];
 
 async function generate() {
   const msg = $("msg");

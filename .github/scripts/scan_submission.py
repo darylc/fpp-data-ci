@@ -50,9 +50,14 @@ def find_duplicate_submission_issues(gh: tuple[str, str] | None, current_issue, 
 
     Compared by (owner, repo) rather than raw URL text: two submissions for the same
     plugin can legitimately point at different branches/paths, but the repo itself is
-    the actual identity. Read cheaply from each candidate's OWN issue-body fields
-    (pluginInfo.json raw URL, or the informational GitHub repo field) — no need to
+    the actual identity. Read cheaply from each candidate's OWN "pluginInfo.json raw
+    URL" field (required on every submission, old template or new) — no need to
     re-fetch every open issue's pluginInfo.json just to compare identity.
+
+    No "GitHub repo" field fallback here: that field was purely informational and has
+    been removed from plugin-submission.yml (see its comments) since it was editable
+    but never actually read — pluginInfo.json raw URL was always the required field,
+    so every open issue, regardless of which template version created it, has one.
     """
     if not gh:
         return []
@@ -62,8 +67,7 @@ def find_duplicate_submission_issues(gh: tuple[str, str] | None, current_issue, 
         if str(issue.get("number")) == str(current_issue):
             continue
         body = issue.get("body") or ""
-        other = (parse_raw_github_repo(field(body, "pluginInfo.json raw URL"))
-                 or parse_github_repo(field(body, "GitHub repo")))
+        other = parse_raw_github_repo(field(body, "pluginInfo.json raw URL"))
         if other and other[0].lower() == owner.lower() and other[1].lower() == repo.lower():
             dupes.append(issue["number"])
     return dupes

@@ -395,7 +395,7 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
                    f"pipes a remote script into a shell ({hit[0]}:{hit[1]}: `{hit[2]}`) - install "
                    f"the dependency through a package manager FPP already has instead: `apt-get "
                    f"install` for system packages, `npm install` for Node packages, or `uv pip "
-                   f"install` for Python packages. Only if there's genuinely no package for it, "
+                   f"install --system` for Python packages. Only if there's genuinely no package for it, "
                    f"download the installer to a file, verify its checksum, then run it, e.g. "
                    f"`curl -fsSLo installer.sh https://example.com/install.sh && "
                    f"echo \"<sha256>  installer.sh\" | sha256sum -c && bash installer.sh`"))
@@ -446,9 +446,15 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
     if hit:
         out.append(Finding(BLOCKER, "break-system-packages",
                    f"pip --break-system-packages corrupts the system Python ({hit[0]}:{hit[1]}: "
-                   f"`{hit[2]}`) - create a venv inside your plugin directory instead, e.g. "
-                   f"`python3 -m venv \"$SCRIPT_DIR/venv\" && \"$SCRIPT_DIR/venv/bin/pip\" install ...`, "
-                   f"then call `\"$SCRIPT_DIR/venv/bin/python3\"` from your plugin code"))
+                   f"`{hit[2]}`) - use `uv pip install --system ...` instead, so the package installs "
+                   f"into the system interpreter without corrupting it"))
+
+    hit = first(r'\bpip3?\s+install\b')
+    if hit and "--break-system-packages" not in hit[2]:
+        out.append(Finding(BEST_PRACTICE, "pip-install",
+                   f"installs Python packages with pip ({hit[0]}:{hit[1]}: `{hit[2]}`) - use "
+                   f"`uv pip install --system` instead, so the dependency resolves and installs the "
+                   f"same way FPP itself manages Python packages"))
 
     # Reading/parsing FPP's raw core config directly (the settings file, channel
     # outputs) is fragile - use getSetting()/$settings/the API. Writing your OWN

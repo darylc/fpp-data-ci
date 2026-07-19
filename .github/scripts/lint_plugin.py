@@ -273,11 +273,20 @@ def _missing_timeout_hits(root: str, exts=(".php", ".py", ".sh")):
                 continue
             call_rx = re.compile(r'requests\.(get|post|put|patch|delete)\s*\(')
         else:  # .sh - checked per line, not file-level
+            # curl to localhost/127.0.0.1 in an install/uninstall script (e.g. hitting
+            # FPP's own API to restart fppd) is excluded: it's a one-shot call at
+            # install/uninstall time, not a recurring hook, and a local connection
+            # fails fast rather than hanging on cross-network TCP retries - the
+            # remaining risk (fppd alive but wedged) doesn't clear the bar here.
+            is_install_script = os.path.basename(path) in ("fpp_install.sh", "fpp_uninstall.sh")
             for i, line in enumerate(text.splitlines(), 1):
                 if _is_comment_line(line):
                     continue
-                if re.search(r'\bcurl\b', line) and not re.search(r'--max-time\b|-m\s+\d|--connect-timeout\b', line):
-                    yield rel, i, line.strip()
+                if not re.search(r'\bcurl\b', line) or re.search(r'--max-time\b|-m\s+\d|--connect-timeout\b', line):
+                    continue
+                if is_install_script and re.search(r'://(localhost|127\.0\.0\.1)\b', line):
+                    continue
+                yield rel, i, line.strip()
             continue
         for i, line in enumerate(text.splitlines(), 1):
             if _is_comment_line(line):
@@ -911,6 +920,21 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
                    "than a Pi Zero's resources to run acceptably, declare it on the versions[] entry "
                    "(see PLUGININFO_FORMAT.md's Resource hints section) so FPP can warn/hide it on "
                    "underpowered devices instead of the user finding out the hard way"))
+
+    # Still implementing the deprecated registerApis(httpserver::webserver*)
+    # overload instead of the modern no-arg registerApis(). FPP's HTTP layer
+    # migrated from libhttpserver to Drogon; the httpserver:: shims keep this
+    # compiling and working, so it's not a bug, just a docs/DEPRECATED.md nudge.
+    hit = first(r'(register|unregister)Apis\s*\(\s*httpserver::webserver',
+               exts=(".cpp", ".c", ".h", ".hpp"))
+    if hit:
+        out.append(Finding(BEST_PRACTICE, "deprecated-httpserver-api",
+                   f"implements the deprecated registerApis(httpserver::webserver*) overload "
+                   f"({hit[0]}:{hit[1]}: `{hit[2]}`) instead of the modern no-arg registerApis() - "
+                   f"this still works via FPP's httpserver:: compat shims over Drogon, but those "
+                   f"shims are on borrowed time (see docs/DEPRECATED.md in the FPP repo). Port to "
+                   f"the no-arg registerApis()/unregisterApis() using drogon::app() or the fpphttp.h "
+                   f"helpers (makeStringResponse(), getRequestArg(), etc.) directly"))
 
     return out
 

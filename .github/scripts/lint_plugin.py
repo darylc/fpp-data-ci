@@ -242,7 +242,7 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
     # everywhere. See www/api/controllers/plugin.php's PluginServeIcon().
     has_icon_url = bool((info or {}).get("iconURL"))
     if "icon.png" not in lower and not has_icon_url:
-        out.append(Finding(OPTIONAL, "no-icon",
+        out.append(Finding(BEST_PRACTICE, "no-icon",
                    "no icon.png in the repo root and no iconURL in pluginInfo.json - the Plugin "
                    "Manager will show your initials instead of an icon. A local icon.png (128x128 "
                    "or 256x256, repo root) is preferred since it renders offline once installed; "

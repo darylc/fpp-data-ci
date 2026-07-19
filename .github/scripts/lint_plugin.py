@@ -828,14 +828,16 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
                    f"match. Write a PID file when starting the process and kill that specific PID "
                    f"instead (checking it's still running your process before killing it)"))
 
-    # Blocking sleep in a lifecycle hook delays fppd startup/shutdown by that
-    # long, every time - guideline 2.6 again, same class as blocking-build-in-hook.
+    # Blocking sleep in a start/stop lifecycle hook delays fppd startup/shutdown
+    # by that long, every time - guideline 2.6 again, same class as
+    # blocking-build-in-hook. fpp_install.sh/fpp_uninstall.sh are excluded: they
+    # run once at install/uninstall time, not on every fppd start/stop.
     hit = None
     for dirpath, dirnames, filenames in os.walk(root):
         if ".git" in dirnames:
             dirnames.remove(".git")
         for fn in filenames:
-            if fn in HOOKS:
+            if fn.startswith(("preStart", "postStart", "preStop", "postStop")):
                 p = os.path.join(dirpath, fn)
                 for i, line in enumerate(_read(p).splitlines(), 1):
                     if _is_comment_line(line):
@@ -904,7 +906,7 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
         or first(r'\b(ffmpeg|opencv|libcamera|videocapture)\b', exts=(".cpp", ".c", ".h", ".hpp", ".py")))
     if looks_heavy:
         out.append(Finding(OPTIONAL, "no-resource-hints",
-                   "looks compute-heavy (native build / video-capture-shaped code) but declares no "
+                   "looks potentially compute/memory heavy (native build / video-capture-shaped code) but declares no "
                    "minMemoryMB/minCpuCores in pluginInfo.json - if this plugin genuinely needs more "
                    "than a Pi Zero's resources to run acceptably, declare it on the versions[] entry "
                    "(see PLUGININFO_FORMAT.md's Resource hints section) so FPP can warn/hide it on "

@@ -98,18 +98,28 @@ jobs:
 
             const commenter = context.payload.comment.user.login;
             const author = context.payload.issue.user.login;
+            const { owner, repo } = context.repo;
             if (commenter.toLowerCase() === author.toLowerCase()) {
               core.setOutput('ok', 'true');
               return;
             }
+            // Repo maintainers (push/maintain/admin on fpp-data-ci) can also trigger
+            // this, not just the original reporter — e.g. to help someone stuck, or
+            // recheck after fixing something on the submitter's behalf.
+            try {
+              const perm = await github.rest.repos.getCollaboratorPermissionLevel({ owner, repo, username: commenter });
+              if (['admin', 'write', 'maintain'].includes(perm.data.permission)) {
+                core.setOutput('ok', 'true');
+                return;
+              }
+            } catch (e) { /* not a collaborator, or lookup failed -- fall through to reject */ }
             core.setOutput('ok', 'false');
-            const { owner, repo } = context.repo;
             const issue_number = context.payload.issue.number;
             await github.rest.issues.createComment({
               owner, repo, issue_number,
-              body: `⚠️ @${commenter} only the original reporter (**@${author}**) can use ` +
-                    `\`/${commandUsed}\` on this issue. If you'd like to submit your own plugin, ` +
-                    `please open a new request at ` +
+              body: `⚠️ @${commenter} only the original reporter (**@${author}**) or a fpp-data-ci ` +
+                    `maintainer can use \`/${commandUsed}\` on this issue. If you'd like to submit your ` +
+                    `own plugin, please open a new request at ` +
                     `https://darylc.github.io/fpp-data-ci/submit_new_plugin/.`,
             });
 

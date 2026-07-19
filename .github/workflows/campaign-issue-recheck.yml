@@ -77,20 +77,29 @@ jobs:
             const commenter = context.payload.comment.user.login;
             const owner = '${{ steps.owner.outputs.owner }}';
             const command = '${{ steps.extract.outputs.command }}';
+            const { owner: repoOwner, repo } = context.repo;
 
             if (owner && commenter.toLowerCase() === owner.toLowerCase()) {
               core.setOutput('ok', 'true');
               return;
             }
+            // Repo maintainers (push/maintain/admin on fpp-data-ci) can also trigger
+            // this, not just the plugin's registered owner.
+            try {
+              const perm = await github.rest.repos.getCollaboratorPermissionLevel({ owner: repoOwner, repo, username: commenter });
+              if (['admin', 'write', 'maintain'].includes(perm.data.permission)) {
+                core.setOutput('ok', 'true');
+                return;
+              }
+            } catch (e) { /* not a collaborator, or lookup failed -- fall through to reject */ }
             core.setOutput('ok', 'false');
-            const { owner: repoOwner, repo } = context.repo;
             const issue_number = context.payload.issue.number;
             await github.rest.issues.createComment({
               owner: repoOwner, repo, issue_number,
               body: `⚠️ @${commenter} only \`${{ steps.extract.outputs.name }}\`'s registered owner` +
                     (owner ? ` (**@${owner}**)` : '') +
-                    ` can use \`/${command}\` on this tracking issue. If you believe this is wrong, ` +
-                    `please contact a maintainer.`,
+                    ` or a fpp-data-ci maintainer can use \`/${command}\` on this tracking issue. If you ` +
+                    `believe this is wrong, please contact a maintainer.`,
             });
 
       - name: Recheck this plugin

@@ -75,6 +75,8 @@ jobs:
           # since ${{ }} splices raw text before bash parses it (see
           # bug-fpp-data-ci-actions-script-injection-repo-name in .wolf/buglog.json).
           REPO_NAME: ${{ steps.extract.outputs.name }}
+          # Lifts gh_get_contributors()'s rate limit from 60/hr (anonymous) to 5000/hr.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python .github/scripts/resolve_plugin_owner.py \
             --plugin-list pluginList.json --repo-name "$REPO_NAME"
@@ -84,16 +86,18 @@ jobs:
         if: steps.extract.outputs.name != '' && steps.extract.outputs.command != ''
         uses: actions/github-script@v7
         env:
-          # PLUGIN_NAME/OWNER/COMMAND trace back to attacker-influenceable issue-body
-          # text -- pass via env/process.env rather than ${{ }}-interpolated directly
-          # into the script (see bug-fpp-data-ci-actions-script-injection-repo-name).
+          # PLUGIN_NAME/OWNER/CONTRIBUTORS/COMMAND trace back to attacker-influenceable
+          # issue-body text -- pass via env/process.env rather than ${{ }}-interpolated
+          # directly into the script (see bug-fpp-data-ci-actions-script-injection-repo-name).
           PLUGIN_NAME: ${{ steps.extract.outputs.name }}
           OWNER: ${{ steps.owner.outputs.owner }}
+          CONTRIBUTORS: ${{ steps.owner.outputs.contributors }}
           COMMAND: ${{ steps.extract.outputs.command }}
         with:
           script: |
             const commenter = context.payload.comment.user.login;
             const owner = process.env.OWNER;
+            const contributors = (process.env.CONTRIBUTORS || '').split(',').map(s => s.trim()).filter(Boolean);
             const command = process.env.COMMAND;
             const pluginName = process.env.PLUGIN_NAME;
             const { owner: repoOwner, repo } = context.repo;
@@ -102,8 +106,19 @@ jobs:
               core.setOutput('ok', 'true');
               return;
             }
+            // Also allow the plugin's own top contributors (commit history only, NOT a
+            // verified collaborator-permission check - fpp-data-ci's token has no
+            // standing to query real access on a repo it doesn't own). Needed because
+            // an org-owned repo's registered "owner" is the org login itself, which no
+            // individual can ever match above - without this, org-owned plugins could
+            // only ever be /recheck'd or /submit'd by fpp-data-ci maintainers, not by
+            // anyone who actually works on the plugin.
+            if (contributors.some(c => c.toLowerCase() === commenter.toLowerCase())) {
+              core.setOutput('ok', 'true');
+              return;
+            }
             // Repo maintainers (push/maintain/admin on fpp-data-ci) can also trigger
-            // this, not just the plugin's registered owner.
+            // this, not just the plugin's registered owner/contributors.
             try {
               const perm = await github.rest.repos.getCollaboratorPermissionLevel({ owner: repoOwner, repo, username: commenter });
               if (['admin', 'write', 'maintain'].includes(perm.data.permission)) {
@@ -117,6 +132,7 @@ jobs:
               owner: repoOwner, repo, issue_number,
               body: `⚠️ @${commenter} only \`${pluginName}\`'s registered owner` +
                     (owner ? ` (**@${owner}**)` : '') +
+                    (contributors.length ? ` or contributor (${contributors.map(c => `\`${c}\``).join(', ')})` : '') +
                     ` or a fpp-data-ci maintainer can use \`/${command}\` on this tracking issue. If you ` +
                     `believe this is wrong, please contact a maintainer.`,
             });

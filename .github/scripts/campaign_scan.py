@@ -120,7 +120,12 @@ def scan_plugin(entry, target, plugins_dir, token, schema):
     # NOTE: "delist" is pluginInfo.schema.json's actual field name (an external
     # contract plugin authors' own repos already use) - do not rename the key itself,
     # only the surrounding prose/identifiers.
-    removal_requested = bool(info.get("delist"))
+    #
+    # `is True` on purpose, not `bool(...)`: "delist" has no schema presence
+    # (additionalProperties: true), so it could be any JSON type, and bool() on a
+    # non-empty STRING is always True regardless of content - a mistaken
+    # `"delist": "false"` would `bool()` to True. Same fix as verify_remove_plugin.py.
+    removal_requested = info.get("delist") is True
     if removal_requested:
         findings.append((OPTIONAL, "removal-requested",
                          "author set \"delist\": true in pluginInfo.json - plugin removal requested"))

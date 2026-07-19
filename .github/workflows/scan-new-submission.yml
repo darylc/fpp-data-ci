@@ -165,9 +165,16 @@ jobs:
         if: steps.authz.outputs.ok == 'true' && steps.extract.outputs.plugininfo_url != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # for the archived/issues-disabled/bugURL check
+          # PLUGININFO_URL is raw, unvalidated text straight off the issue form (this
+          # scan is what validates it -- nothing has checked it yet) -- passed via env
+          # and referenced as "$PLUGININFO_URL" rather than ${{ }}-interpolated
+          # directly into the script text, so shell metacharacters in it can't break
+          # out of the intended command. Same class of fix as the "Comment + close"
+          # step in remove-plugin-verify.yml.
+          PLUGININFO_URL: ${{ steps.extract.outputs.plugininfo_url }}
         run: |
           python .github/scripts/scan_submission.py \
-            --plugininfo-url "${{ steps.extract.outputs.plugininfo_url }}" \
+            --plugininfo-url "$PLUGININFO_URL" \
             --schema .github/schema/pluginInfo.schema.json \
             --plugin-list pluginList.json \
             --reporter "${{ github.event.issue.user.login }}" \
@@ -179,6 +186,14 @@ jobs:
         id: comment
         if: steps.authz.outputs.ok == 'true' && steps.extract.outputs.plugininfo_url != ''
         uses: actions/github-script@v7
+        env:
+          # CATEGORY is raw text parsed off the (editable) issue body, not schema-
+          # constrained -- passed via env/process.env rather than ${{ }}-interpolated
+          # directly into the script text, so a value containing a `'` can't break out
+          # of the JS string literal it'd otherwise land in. Same class of fix as this
+          # workflow's PLUGININFO_URL above and remove-plugin-verify.yml's REMOVED/
+          # ERROR_MSG.
+          CATEGORY: ${{ steps.extract.outputs.category }}
         with:
           script: |
             const fs = require('fs');
@@ -211,7 +226,7 @@ jobs:
             // the reporter below, they didn't ask for this notification by opening the issue,
             // so pinging them unprompted would be the same spam problem MENTION_OWNER=False
             // avoids for the campaign scanner in lib_plugin_schema.py.
-            const category = '${{ steps.extract.outputs.category }}';
+            const category = process.env.CATEGORY || '';
             const fields = [];
             if (result.repo_name) fields.push(`**Plugin:** ${result.repo_name}`);
             if (result.repo_url) fields.push(`**Repo:** ${result.repo_url}`);
@@ -337,19 +352,31 @@ jobs:
       - name: Add pluginList.json entry on a branch
         id: edit
         if: steps.authz.outputs.ok == 'true' && steps.comment.outputs.ready == 'true'
+        env:
+          # All three are attacker-influenceable free text (REPO_NAME can come
+          # straight from pluginInfo.json's self-declared "repoName" field, which
+          # schema validation flags but does not block when /submit overrides a
+          # failing scan; PLUGININFO_URL and CATEGORY are raw issue-form text with no
+          # schema gate at all). Passed via env and referenced as "$VAR" rather than
+          # ${{ }}-interpolated directly into the script/commit-message text, so shell
+          # metacharacters in any of them can't break out of the intended commands.
+          REPO_NAME: ${{ steps.comment.outputs.repo_name }}
+          PLUGININFO_URL: ${{ steps.extract.outputs.plugininfo_url }}
+          CATEGORY: ${{ steps.extract.outputs.category }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          BRANCH="add-plugin/${{ steps.comment.outputs.repo_name }}"
+          BRANCH="add-plugin/$REPO_NAME"
           git checkout -B "$BRANCH"
 
           OUT=$(python .github/scripts/add_plugin_entry.py \
             --plugin-list pluginList.json \
             --categories pluginCategories.json \
-            --repo-name "${{ steps.comment.outputs.repo_name }}" \
-            --plugininfo-url "${{ steps.extract.outputs.plugininfo_url }}" \
-            --category "${{ steps.extract.outputs.category }}") || true
+            --repo-name "$REPO_NAME" \
+            --plugininfo-url "$PLUGININFO_URL" \
+            --category "$CATEGORY") || true
           echo "$OUT"
           {
             echo "status<<EOF"
@@ -360,22 +387,29 @@ jobs:
 
           if [[ "$OUT" == ADDED* ]]; then
             git add pluginList.json
-            git commit -m "Add ${{ steps.comment.outputs.repo_name }} to pluginList.json
+            git commit -m "Add $REPO_NAME to pluginList.json
 
-          Requested in #${{ github.event.issue.number }}."
+          Requested in #$ISSUE_NUMBER."
             git push -f origin "$BRANCH"
           fi
 
       - name: Open or update the listing PR
         if: steps.authz.outputs.ok == 'true' && steps.comment.outputs.ready == 'true' && startsWith(steps.edit.outputs.status, 'ADDED')
         uses: actions/github-script@v7
+        env:
+          # BRANCH/REPO_NAME both ultimately trace back to attacker-influenceable
+          # free text (see the "Add pluginList.json entry" step above) -- env/
+          # process.env rather than ${{ }}-interpolated into the script text, so a
+          # value containing a `'` can't break out of the JS string literal.
+          BRANCH: ${{ steps.edit.outputs.branch }}
+          REPO_NAME: ${{ steps.comment.outputs.repo_name }}
         with:
           script: |
             const fs = require('fs');
             const { owner, repo } = context.repo;
             const issue_number = context.payload.issue.number;
-            const branch = '${{ steps.edit.outputs.branch }}';
-            const repoName = '${{ steps.comment.outputs.repo_name }}';
+            const branch = process.env.BRANCH;
+            const repoName = process.env.REPO_NAME;
 
             const result = JSON.parse(fs.readFileSync('scan-result.json', 'utf8'));
             const badge = { blocker: '🛑', 'best-practice': '⚠️', optional: '💡' };
@@ -455,13 +489,15 @@ jobs:
       - name: Comment if already listed
         if: steps.authz.outputs.ok == 'true' && steps.comment.outputs.ready == 'true' && startsWith(steps.edit.outputs.status, 'ALREADY_LISTED')
         uses: actions/github-script@v7
+        env:
+          REPO_NAME: ${{ steps.comment.outputs.repo_name }}
         with:
           script: |
             const { owner, repo } = context.repo;
             const issue_number = context.payload.issue.number;
             await github.rest.issues.createComment({
               owner, repo, issue_number,
-              body: `\`${{ steps.comment.outputs.repo_name }}\` is already in \`pluginList.json\` - nothing to do here. Closing.`,
+              body: `\`${process.env.REPO_NAME}\` is already in \`pluginList.json\` - nothing to do here. Closing.`,
             });
             await github.rest.issues.update({ owner, repo, issue_number, state: 'closed' });
 

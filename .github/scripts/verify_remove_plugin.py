@@ -86,7 +86,14 @@ def resolve_owner(repo_name: str, plugin_list_path: str, token):
             # name - an external contract, not renamed here). Only a writer could, so
             # it proves control even for an org repo - and it doubles as the
             # machine-readable removal signal.
-            delist = bool(info.get("delist"))
+            #
+            # `is True` on purpose, not `bool(...)`: "delist" has no schema presence
+            # (additionalProperties: true), so it could be any JSON type. bool() on a
+            # non-empty STRING is always True regardless of content -- a mistaken
+            # `"delist": "false"` would `bool()` to True and be treated as proof-of-
+            # control granted. `is True` only accepts a real JSON boolean `true`,
+            # matching the documented contract everywhere this is explained to authors.
+            delist = info.get("delist") is True
             # owner/repo primarily from pluginList.json's OWN infoURL (entry[1]),
             # not pluginInfo.json's self-declared srcURL: we just fetched `info`
             # from that URL successfully, so it's a raw.githubusercontent.com/

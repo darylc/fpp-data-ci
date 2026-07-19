@@ -119,12 +119,21 @@ jobs:
       - name: Look up this plugin's pluginInfo.json URL, and master's pluginList.json
         id: lookup
         if: steps.authz.outputs.ok == 'true'
+        env:
+          # REPO_NAME is attacker-influenceable free text (see recheck-listing-pr.yml's
+          # header comment / lib_plugin_schema.resolve_repo_name()'s fallback). ${{ }}
+          # substitution happens BEFORE this heredoc is even parsed, so splicing it
+          # directly into the `name = "..."` line would be Python code injection, not
+          # just shell -- reading it via os.environ instead means it's always just
+          # string data, regardless of content.
+          REPO_NAME: ${{ steps.extract.outputs.repo_name }}
         run: |
           git show origin/master:pluginList.json > base-pluginList.json
           python - <<'EOF' >> "$GITHUB_OUTPUT"
           import json
+          import os
           data = json.load(open('pluginList.json'))
-          name = "${{ steps.extract.outputs.repo_name }}"
+          name = os.environ["REPO_NAME"]
           entry = next((e for e in data['pluginList'] if isinstance(e, list) and e and e[0] == name), None)
           url = entry[1] if entry and len(entry) > 1 else ''
           print(f"plugininfo_url={url}")
@@ -189,13 +198,19 @@ jobs:
       - name: Report unresolvable pluginInfo.json URL
         if: steps.authz.outputs.ok == 'true' && steps.lookup.outputs.plugininfo_url == ''
         uses: actions/github-script@v7
+        env:
+          # See the "Look up..." step's comment -- REPO_NAME is attacker-influenceable
+          # free text; env/process.env instead of ${{ }}-interpolating it directly
+          # into a JS template literal, since a backtick or `${` in it could otherwise
+          # break out of the intended string.
+          REPO_NAME: ${{ steps.extract.outputs.repo_name }}
         with:
           script: |
             const { owner, repo } = context.repo;
             const issue_number = context.payload.issue.number;
             await github.rest.issues.createComment({
               owner, repo, issue_number,
-              body: `⚠️ Could not find \`${{ steps.extract.outputs.repo_name }}\` in this branch's ` +
+              body: `⚠️ Could not find \`${process.env.REPO_NAME}\` in this branch's ` +
                     `\`pluginList.json\` - the branch may have been hand-edited. A maintainer will need ` +
                     `to look at this manually.`,
             });

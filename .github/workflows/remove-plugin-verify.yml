@@ -245,7 +245,7 @@ jobs:
                     `automated check above confirms it can't find a matching entry.\n\n` +
                     `If you believe this plugin *should* be listed (or you meant a different/renamed ` +
                     `repo), please submit a new listing request via the guided form: ` +
-                    `https://darylc.github.io/fpp-data-ci/submit_remove_plugin/\n\n` +
+                    `https://darylc.github.io/fpp-data-ci/submit_new_plugin/\n\n` +
                     `Closing this one out since there's no existing listing to act on. If this is ` +
                     `wrong, comment \`/submit\` and we'll flag it for a maintainer instead.`});
             await github.rest.issues.update({owner, repo, issue_number, state: 'closed'});
@@ -261,16 +261,25 @@ jobs:
         if: >-
           steps.authz.outputs.ok == 'true' && steps.authz.outputs.command == 'submit' &&
           steps.verify.outputs.verdict == 'unconfirmed'
+        env:
+          # REPO_NAME traces back to resolve_repo_name_field()'s fallback, which can
+          # return arbitrary submitter-typed text unmodified (see
+          # lib_plugin_schema.resolve_repo_name()) -- passed via env and referenced as
+          # "$REPO_NAME" rather than ${{ }}-interpolated directly into the script/
+          # commit-message text, so shell metacharacters in it can't break out of the
+          # intended commands.
+          REPO_NAME: ${{ steps.verify.outputs.repo_name }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          BRANCH="remove-plugin/${{ steps.verify.outputs.repo_name }}"
+          BRANCH="remove-plugin/$REPO_NAME"
           git checkout -B "$BRANCH"
 
           OUT=$(python .github/scripts/remove_plugin_entry.py \
             --plugin-list pluginList.json \
-            --repo-name "${{ steps.verify.outputs.repo_name }}") || true
+            --repo-name "$REPO_NAME") || true
           echo "$OUT"
           {
             echo "status<<EOF"
@@ -281,7 +290,7 @@ jobs:
 
           if [[ "$OUT" == removed:* ]]; then
             git add pluginList.json
-            git commit -m "Remove ${{ steps.verify.outputs.repo_name }} (escalated from issue #${{ github.event.issue.number }})"
+            git commit -m "Remove $REPO_NAME (escalated from issue #$ISSUE_NUMBER)"
             git push -f origin "$BRANCH"
           fi
 
@@ -290,12 +299,21 @@ jobs:
           steps.authz.outputs.ok == 'true' && steps.authz.outputs.command == 'submit' &&
           steps.verify.outputs.verdict == 'unconfirmed' && startsWith(steps.escalate.outputs.status, 'removed')
         uses: actions/github-script@v7
+        env:
+          # REPO_NAME/BRANCH trace back to attacker-influenceable free text (see the
+          # "Escalate..." step above) -- env/process.env rather than ${{ }}-
+          # interpolated into the script text, so a value containing a `'` can't break
+          # out of the JS string literal. (OWNER is GitHub-API-derived and thus
+          # charset-constrained by GitHub itself, so it's left as direct
+          # interpolation.)
+          REPO_NAME: ${{ steps.verify.outputs.repo_name }}
+          BRANCH: ${{ steps.escalate.outputs.branch }}
         with:
           script: |
             const { owner, repo } = context.repo;
             const issue_number = context.payload.issue.number;
-            const repoName = '${{ steps.verify.outputs.repo_name }}';
-            const branch = '${{ steps.escalate.outputs.branch }}';
+            const repoName = process.env.REPO_NAME;
+            const branch = process.env.BRANCH;
             const registeredOwner = '${{ steps.verify.outputs.owner }}';
             const reporter = context.payload.issue.user.login;
 
@@ -349,9 +367,12 @@ jobs:
         if: steps.authz.outputs.ok == 'true' && steps.verify.outputs.verdict == 'verified'
         env:
           ISSUE_BODY: ${{ github.event.issue.body }}
+          # See the "Escalate unconfirmed ownership" step's comment -- same
+          # attacker-influenceable-free-text concern, same env-var mitigation.
+          REPO_NAME: ${{ steps.verify.outputs.repo_name }}
         run: |
           python .github/scripts/remove_plugin_entry.py \
-            --plugin-list pluginList.json --repo-name "${{ steps.verify.outputs.repo_name }}"
+            --plugin-list pluginList.json --repo-name "$REPO_NAME"
 
       - name: Commit and push
         if: steps.remove.outputs.removed

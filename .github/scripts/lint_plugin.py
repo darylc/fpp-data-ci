@@ -497,9 +497,15 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
     # A build step run synchronously in preStart/postStart delays fppd startup
     # by however long the (re)build takes - tens of seconds to minutes on a
     # cold Pi Zero rebuild - directly violating guideline 2.6 (no blocking work
-    # in these hooks). Scoped to preStart.sh/postStart.sh specifically, not all
-    # 6 hooks - a build in fpp_install.sh (a one-time, not every-boot, step) is
-    # normal and NOT flagged.
+    # in these hooks). It's also almost always dead weight, not a safety net:
+    # fpp_install.sh already builds on fresh install and on plugin-only update
+    # (upgrade_plugin falls back to fpp_install.sh when there's no
+    # fpp_upgrade.sh), and FPP's own core-upgrade path (compileBinaries() in
+    # scripts/functions) rebuilds every plugin with a root Makefile before
+    # restarting fppd - so a build in the hook just repeats work already done.
+    # Scoped to preStart.sh/postStart.sh specifically, not all 6 hooks - a
+    # build in fpp_install.sh (a one-time, not every-boot, step) is normal and
+    # NOT flagged.
     hit = None
     for dirpath, dirnames, filenames in os.walk(root):
         if ".git" in dirnames:
@@ -521,9 +527,15 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
         out.append(Finding(BLOCKER, "blocking-build-in-hook",
                    f"runs a build step synchronously in {os.path.basename(hit[0])} ({hit[0]}:"
                    f"{hit[1]}: `{hit[2]}`) - this delays fppd startup by however long the "
-                   f"(re)build takes, every single boot. Build once in fpp_install.sh instead, and "
-                   f"have preStart.sh/postStart.sh just check whether a rebuild is actually needed "
-                   f"(e.g. compare a version/hash file) before doing any work"))
+                   f"(re)build takes, every single boot. This is almost always redundant, not a "
+                   f"safety net: fpp_install.sh already builds on fresh install and on plugin-only "
+                   f"update (the Plugin Manager falls back to fpp_install.sh when there's no "
+                   f"fpp_upgrade.sh), and FPP's own core-upgrade path rebuilds every plugin with a "
+                   f"root Makefile before restarting fppd - so this hook rarely has anything left to "
+                   f"do. Move the build into fpp_install.sh (or fpp_upgrade.sh) if it isn't there "
+                   f"already, and delete it from the hook; only keep a cheap existence/fingerprint "
+                   f"check here if you have a real reason to distrust the binary at boot (e.g. an SD "
+                   f"image clone from a different CPU)"))
 
     # Hardcoded absolute paths that bypass FPP's own directory conventions:
     # /home/pi/ (should be ${MEDIADIR}/${FPPDIR}, and inconsistent with a

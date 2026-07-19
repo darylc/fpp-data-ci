@@ -34,16 +34,24 @@ import re
 import lib_plugin_schema as lib
 
 
-def field(body: str, label: str) -> str:
-    """Value under a GitHub issue-form '### <label>' heading (first non-empty line)."""
-    lines = body.splitlines()
-    for i, line in enumerate(lines):
-        if line.strip().lstrip("#").strip().lower() == label.lower():
-            for nxt in lines[i + 1:]:
-                s = nxt.strip()
-                if s and not s.startswith("#"):
-                    return s
-    return ""
+field = lib.field  # moved into lib_plugin_schema.py — shared with scan_submission.py
+
+
+def find_duplicate_removal_issues(repo_name: str, current_issue: str, gh_repo: str, token) -> list[int]:
+    """Other OPEN removal-request issues asking about the same repoName (case-
+    insensitive, matching resolve_owner()'s own casing tolerance)."""
+    dupes = []
+    for issue in lib.list_open_issues(gh_repo, "removal-request", token):
+        if str(issue.get("number")) == str(current_issue):
+            continue
+        other_name = resolve_repo_name_field(issue.get("body") or "")
+        if other_name and other_name.lower() == repo_name.lower():
+            dupes.append(issue["number"])
+    return dupes
+
+
+def resolve_repo_name_field(body: str) -> str:
+    return lib.resolve_repo_name(field(body, "Plugin repoName") or field(body, "repoName"))
 
 
 def resolve_owner(repo_name: str, plugin_list_path: str, token):
@@ -113,12 +121,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--plugin-list", default="pluginList.json")
     ap.add_argument("--output", default="removal-verify.md")
+    ap.add_argument("--gh-repo", default=None, help="owner/repo this issue lives in, for duplicate-request detection")
+    ap.add_argument("--current-issue", default=None)
     args = ap.parse_args()
 
     author = (os.environ.get("ISSUE_AUTHOR") or "").strip()
     body = os.environ.get("ISSUE_BODY") or ""
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-    repo_name = lib.resolve_repo_name(field(body, "Plugin repoName") or field(body, "repoName"))
+    repo_name = resolve_repo_name_field(body)
     # Third-party reports (submitter isn't the author) can never prove ownership,
     # so they skip straight to human review instead of being asked for delist:true
     # proof-of-control they have no way to provide.
@@ -201,6 +211,12 @@ def main():
                 f"Once it's pushed, comment `/recheck` on this issue and we'll re-verify automatically "
                 f"— no need to open a new issue.")
 
+    # Other OPEN removal requests for the same plugin — independent of verdict, since
+    # even a not_found/error request can still duplicate a genuinely pending one.
+    dupes: list[int] = []
+    if repo_name and args.gh_repo and args.current_issue:
+        dupes = find_duplicate_removal_issues(repo_name, args.current_issue, args.gh_repo, token)
+
     with open(args.output, "w", encoding="utf-8") as f:
         f.write(f"### Plugin removal ownership check — `{verdict}`\n\n{msg}\n")
     out = os.environ.get("GITHUB_OUTPUT")
@@ -208,6 +224,7 @@ def main():
         with open(out, "a", encoding="utf-8") as f:
             f.write(f"verdict={verdict}\n")
             f.write(f"repo_name={repo_name}\n")
+            f.write(f"duplicate_issues={','.join(str(n) for n in dupes)}\n")
     print(f"{verdict}: {msg}")
 
 

@@ -176,6 +176,39 @@ def gh_get_repo(owner: str, repo: str, token: Optional[str]) -> tuple[Optional[d
         return None, str(e)
 
 
+def list_open_issues(gh_repo: str, label: str, token: Optional[str]) -> list[dict]:
+    """Open issues on `gh_repo` (\"owner/repo\") carrying `label`. One page (100) is
+    plenty for this repo's issue volume — not worth paginating.
+
+    Used for same-plugin duplicate-open-request detection (removal and submission
+    flows both label their issue kind, so filtering server-side keeps this cheap).
+    """
+    api = f"https://api.github.com/repos/{gh_repo}/issues?state=open&labels={label}&per_page=100"
+    headers = {"User-Agent": USER_AGENT, "Accept": "application/vnd.github+json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        req = urllib.request.Request(api, headers=headers)
+        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
+            return json.loads(resp.read().decode("utf-8", "replace"))
+    except Exception:  # noqa: BLE001 — best-effort; a failure here just skips dupe detection
+        return []
+
+
+def field(body: str, label: str) -> str:
+    """Value under a GitHub issue-form '### <label>' heading (first non-empty line).
+    Shared by every script that parses an issue-form body — the field/heading shape
+    is a GitHub Issue Forms convention, not specific to any one flow."""
+    lines = (body or "").splitlines()
+    for i, line in enumerate(lines):
+        if line.strip().lstrip("#").strip().lower() == label.lower():
+            for nxt in lines[i + 1:]:
+                s = nxt.strip()
+                if s and not s.startswith("#"):
+                    return s
+    return ""
+
+
 def load_categories(path: str) -> set[str]:
     """Load the allowed category names from pluginCategories.json.
 

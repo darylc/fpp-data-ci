@@ -33,7 +33,9 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lib_plugin_schema import (  # noqa: E402
     fetch_json,
+    field,
     gh_get_repo,
+    list_open_issues,
     load_pluginlist,
     parse_github_repo,
     parse_raw_github_repo,
@@ -41,6 +43,30 @@ from lib_plugin_schema import (  # noqa: E402
     schema_validation_error,
 )
 from lint_plugin import lint_plugin_dir, BLOCKER, BEST_PRACTICE, OPTIONAL  # noqa: E402
+
+
+def find_duplicate_submission_issues(gh: tuple[str, str] | None, current_issue, gh_repo: str, token) -> list[int]:
+    """Other OPEN submission issues naming the same github.com repo.
+
+    Compared by (owner, repo) rather than raw URL text: two submissions for the same
+    plugin can legitimately point at different branches/paths, but the repo itself is
+    the actual identity. Read cheaply from each candidate's OWN issue-body fields
+    (pluginInfo.json raw URL, or the informational GitHub repo field) — no need to
+    re-fetch every open issue's pluginInfo.json just to compare identity.
+    """
+    if not gh:
+        return []
+    owner, repo = gh
+    dupes = []
+    for issue in list_open_issues(gh_repo, "submission", token):
+        if str(issue.get("number")) == str(current_issue):
+            continue
+        body = issue.get("body") or ""
+        other = (parse_raw_github_repo(field(body, "pluginInfo.json raw URL"))
+                 or parse_github_repo(field(body, "GitHub repo")))
+        if other and other[0].lower() == owner.lower() and other[1].lower() == repo.lower():
+            dupes.append(issue["number"])
+    return dupes
 
 
 def already_listed(repo_name: str, plugin_list_path: str) -> bool:
@@ -80,6 +106,7 @@ def main():
     ap.add_argument("--plugin-list", default="pluginList.json")
     ap.add_argument("--reporter", default=None, help="GitHub login of the issue's original reporter")
     ap.add_argument("--issue-number", default=None)
+    ap.add_argument("--gh-repo", default=None, help="owner/repo this issue lives in, for duplicate-request detection")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -144,6 +171,13 @@ def main():
                           f"`{repo_name}` is already in pluginList.json — nothing to do here."))
         dup_blocking = True
 
+    # --- other OPEN submission issue(s) for the same repo -----------------------
+    # Independent of dup_blocking/findings above — even a submission that's already
+    # listed, or still failing lint, can duplicate a separate pending request.
+    duplicate_issues: list[int] = []
+    if gh and args.gh_repo and args.issue_number:
+        duplicate_issues = find_duplicate_submission_issues(gh, args.issue_number, args.gh_repo, token)
+
     # --- clone + static lint --------------------------------------------------
     linted = False
     if dup_blocking:
@@ -175,6 +209,7 @@ def main():
         "owner_confirmed": owner_confirmed,
         "repo_name": repo_name,
         "repo_url": f"https://github.com/{gh[0]}/{gh[1]}" if gh else None,
+        "duplicate_issues": duplicate_issues,
         "findings": [{"severity": s, "code": c, "message": m} for s, c, m in findings],
         "num_blocking": len(blocking),
         "num_advisory": len(advisory),

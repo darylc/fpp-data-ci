@@ -141,6 +141,7 @@ jobs:
             --plugin-list pluginList.json \
             --reporter "${{ github.event.issue.user.login }}" \
             --issue-number "${{ github.event.issue.number }}" \
+            --gh-repo "${{ github.repository }}" \
             --out scan-result.json
 
       - name: Comment results
@@ -250,6 +251,23 @@ jobs:
             // scan_submission.py, which derived them straight from pluginInfo.json.
             core.setOutput('repo_name', result.repo_name || '');
             core.setOutput('repo_url', result.repo_url || '');
+            core.setOutput('duplicate_issues', (result.duplicate_issues || []).join(','));
+
+      - name: Notify existing open request(s) for the same plugin
+        # Only on a genuinely NEW issue -- an edit or /recheck on an existing one
+        # would otherwise re-notify the same duplicates repeatedly.
+        if: steps.authz.outputs.ok == 'true' && github.event.action == 'opened' && steps.comment.outputs.duplicate_issues != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.issue.number;
+            const dupes = '${{ steps.comment.outputs.duplicate_issues }}'.split(',').filter(Boolean);
+            for (const numStr of dupes) {
+              const other = parseInt(numStr, 10);
+              await github.rest.issues.createComment({ owner, repo, issue_number: other,
+                body: `👀 A new submission for the same plugin was just opened: #${issue_number}.` });
+            }
 
       - name: Add pluginList.json entry on a branch
         id: edit

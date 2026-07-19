@@ -249,7 +249,7 @@ jobs:
               msg = ['### 🛑 Automated compliance scan: needs changes',
                      ''];
               if (fieldBlock) msg.push(...fieldBlock, '');
-              msg.push(`@${reporter} found ${result.num_blocking} issue(s) that must be fixed before this can be merged:`,
+              msg.push(`@${reporter} found ${result.num_blocking} issue(s) this must be fixed before the plugin can be listed:`,
                      '');
               for (const f of findings) {
                 if (f.severity === 'optional') continue;

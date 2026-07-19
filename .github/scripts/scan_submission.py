@@ -129,34 +129,8 @@ def main():
         if schema_err:
             findings.append((BLOCKER, "schema", schema_err))
 
-    # --- repo metadata (archived / issues-disabled / bugURL) --------------------
     gh = parse_github_repo(info.get("srcURL", "") or "") if info else None
     gh = gh or parse_raw_github_repo(args.plugininfo_url)
-    if gh:
-        owner, repo = gh
-        meta, _ = gh_get_repo(owner, repo, token)
-        if meta:
-            findings.extend(repo_metadata_findings(meta, (info or {}).get("bugURL", "")))
-
-    # --- ownership: submitter must own the repo, or prove write access ---------
-    # Unlike removal (verify_remove_plugin.py), a submission had NO ownership check
-    # at all until now — anyone could list anyone else's plugin. Mirrors removal's
-    # "delist": true proof-of-control trick: only someone with push access could add
-    # a specific string to their OWN pluginInfo.json. The token is tied to this one
-    # issue (not a permanent flag like "delist") so an old, already-approved
-    # submission's public token can't be replayed as proof for a different request.
-    owner_confirmed = True
-    if gh and args.reporter and gh[0].lower() != args.reporter.lower():
-        expected = f"fpp-{args.issue_number}"
-        got = str((info or {}).get("submissionToken", "")).strip()
-        if got != expected:
-            owner_confirmed = False
-            findings.append((BLOCKER, "owner-unconfirmed",
-                f"submitter @{args.reporter} does not match `{gh[0]}`, this repo's registered owner "
-                f"(from srcURL). Add `\"submissionToken\": \"{expected}\"` to your pluginInfo.json and "
-                f"comment `/recheck` to prove you have write access here — or, if you're submitting on "
-                f"the owner's behalf with their consent, comment `/submit` instead to flag this for a "
-                f"maintainer's judgement rather than auto-verifying."))
 
     # repoName always comes from pluginInfo.json itself, falling back to the github.com
     # repo slug (from srcURL/plugininfo-url) only if the JSON omits it — schema
@@ -164,42 +138,69 @@ def main():
     # fallback just keeps clone/lint working in that already-failing case too.
     repo_name = (info or {}).get("repoName") or (gh[1] if gh else None)
 
-    # --- already listed? short-circuit before the expensive clone+lint below ---
-    # Previously this was only caught much later, in add_plugin_entry.py, AFTER a
-    # full clone + lint had already run for a submission that was always going to be
-    # rejected as a duplicate — wasted work and a slower "no" for the submitter.
-    # Checking here means it shows up as a normal finding in this same comment.
-    dup_blocking = False
-    if repo_name and already_listed(repo_name, args.plugin_list):
-        findings.append((BLOCKER, "already-listed",
-                          f"`{repo_name}` is already in pluginList.json — nothing to do here."))
-        dup_blocking = True
+    # --- already listed? short-circuit EVERYTHING else below --------------------
+    # Previously this was only caught much later, in add_plugin_entry.py, AFTER a full
+    # ownership check + clone + lint had already run for a submission that was always
+    # going to be rejected as a duplicate. None of that is useful once we already know
+    # the answer is "nothing to do here" — repo-metadata findings, the owner-vs-
+    # submitter check, and clone+lint are all skipped, so the result is ONLY the
+    # already-listed finding, not a pile of irrelevant blockers.
+    already = bool(repo_name and already_listed(repo_name, args.plugin_list))
 
-    # --- other OPEN submission issue(s) for the same repo -----------------------
-    # Independent of dup_blocking/findings above — even a submission that's already
-    # listed, or still failing lint, can duplicate a separate pending request.
+    # Other OPEN submission issue(s) for the same repo — independent of `already`
+    # above, and always worth checking regardless of it (a listed plugin's repo could
+    # still have a separate, unrelated pending re-submission open).
     duplicate_issues: list[int] = []
     if gh and args.gh_repo and args.issue_number:
         duplicate_issues = find_duplicate_submission_issues(gh, args.issue_number, args.gh_repo, token)
 
-    # --- clone + static lint --------------------------------------------------
+    owner_confirmed = True
     linted = False
-    if dup_blocking:
-        pass
-    elif gh:
-        owner, repo = gh
-        with tempfile.TemporaryDirectory() as tmp:
-            dest = os.path.join(tmp, repo)
-            clone_err = clone_repo(owner, repo, dest)
-            if clone_err:
-                findings.append((BLOCKER, "clone-failed", clone_err))
-            else:
-                linted = True
-                for f in lint_plugin_dir(dest, repo_name or repo, info=info):
-                    findings.append((f.severity, f.code, f.message))
+    if already:
+        findings.append((BLOCKER, "already-listed",
+                          f"`{repo_name}` is already in pluginList.json — nothing to do here."))
     else:
-        findings.append((BLOCKER, "no-repo-url",
-                          "could not determine a github.com repo from srcURL or the pluginInfo.json URL"))
+        # --- repo metadata (archived / issues-disabled / bugURL) ----------------
+        if gh:
+            owner, repo = gh
+            meta, _ = gh_get_repo(owner, repo, token)
+            if meta:
+                findings.extend(repo_metadata_findings(meta, (info or {}).get("bugURL", "")))
+
+        # --- ownership: submitter must own the repo, or prove write access -----
+        # Unlike removal (verify_remove_plugin.py), a submission had NO ownership check
+        # at all until now — anyone could list anyone else's plugin. Mirrors removal's
+        # "delist": true proof-of-control trick: only someone with push access could add
+        # a specific string to their OWN pluginInfo.json. The token is tied to this one
+        # issue (not a permanent flag like "delist") so an old, already-approved
+        # submission's public token can't be replayed as proof for a different request.
+        if gh and args.reporter and gh[0].lower() != args.reporter.lower():
+            expected = f"fpp-{args.issue_number}"
+            got = str((info or {}).get("submissionToken", "")).strip()
+            if got != expected:
+                owner_confirmed = False
+                findings.append((BLOCKER, "owner-unconfirmed",
+                    f"submitter @{args.reporter} does not match `{gh[0]}`, this repo's registered owner "
+                    f"(from srcURL). Add `\"submissionToken\": \"{expected}\"` to your pluginInfo.json and "
+                    f"comment `/recheck` to prove you have write access here — or, if you're submitting on "
+                    f"the owner's behalf with their consent, comment `/submit` instead to flag this for a "
+                    f"maintainer's judgement rather than auto-verifying."))
+
+        # --- clone + static lint -------------------------------------------------
+        if gh:
+            owner, repo = gh
+            with tempfile.TemporaryDirectory() as tmp:
+                dest = os.path.join(tmp, repo)
+                clone_err = clone_repo(owner, repo, dest)
+                if clone_err:
+                    findings.append((BLOCKER, "clone-failed", clone_err))
+                else:
+                    linted = True
+                    for f in lint_plugin_dir(dest, repo_name or repo, info=info):
+                        findings.append((f.severity, f.code, f.message))
+        else:
+            findings.append((BLOCKER, "no-repo-url",
+                              "could not determine a github.com repo from srcURL or the pluginInfo.json URL"))
 
     # --- verdict ---------------------------------------------------------------
     # Stricter than the campaign: BEST_PRACTICE blocks a new submission, not just BLOCKER.
@@ -208,6 +209,7 @@ def main():
 
     result = {
         "pass": not blocking,
+        "already_listed": already,
         "linted": linted,
         "owner": gh[0] if gh else None,   # registered owner from srcURL — may differ from the submitter
         "owner_confirmed": owner_confirmed,

@@ -186,6 +186,27 @@ jobs:
             if (category) fields.push(`**Category:** ${category}`);
             const fieldBlock = fields.length ? fields : null;
 
+            // Already listed short-circuits everything else: no bullet list of
+            // findings (there aren't any others — scan_submission.py skipped the
+            // ownership check, repo-metadata, and clone+lint entirely once it knew
+            // this), no /recheck or /submit guidance (there's nothing to fix or
+            // override), just the fact and a close. Mirrors verify_remove_plugin.py's
+            // not_found auto-close on the removal side.
+            if (result.already_listed) {
+              const { owner, repo } = context.repo;
+              const issue_number = context.payload.issue.number;
+              const lines = [`${MARKER}`, '### 📦 Already listed', ''];
+              if (fieldBlock) lines.push(...fieldBlock, '');
+              lines.push(`\`${result.repo_name}\` is already in \`pluginList.json\` — nothing to do here. Closing.`);
+              await github.rest.issues.createComment({ owner, repo, issue_number, body: lines.join('\n') });
+              await github.rest.issues.update({ owner, repo, issue_number, state: 'closed' });
+              core.setOutput('ready', 'false');
+              core.setOutput('repo_name', result.repo_name || '');
+              core.setOutput('repo_url', result.repo_url || '');
+              core.setOutput('duplicate_issues', (result.duplicate_issues || []).join(','));
+              return;
+            }
+
             let msg;
             if (result.pass) {
               msg = ['### ✅ Automated compliance scan: passed',
@@ -218,6 +239,10 @@ jobs:
               for (const f of optional) msg.push(`- ${f.message}`);
               msg.push('', '</details>');
             }
+            // already_listed returns early above, so reaching here means linting was
+            // either skipped for a genuine clone/repo-resolution failure (a real
+            // "clone-failed"/"no-repo-url" finding is already in the list above) or it
+            // succeeded — either way this note is accurate.
             if (!result.linted) {
               msg.push('', '_Note: could not clone the repo to run the static lint — only pluginInfo.json itself was checked._');
             }

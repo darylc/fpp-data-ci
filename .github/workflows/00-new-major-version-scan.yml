@@ -11,7 +11,7 @@
 # nobody is notified. Creating the real tracking issues is OPT-IN via the
 # create_issues input (still no @-mention), and defaults to OFF for safe testing.
 
-name: Plugin compliance scan
+name: New Major version - Plugin author notification
 
 on:
   workflow_dispatch:

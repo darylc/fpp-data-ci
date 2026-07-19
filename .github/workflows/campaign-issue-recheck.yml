@@ -1,5 +1,5 @@
 # On-demand recheck for a single campaign tracking issue, instead of only via the
-# bulk manual campaign run (plugin-compliance-scan.yml) or the daily reconcile sweep
+# bulk manual campaign run (00-new-major-version-scan.yml) or the daily reconcile sweep
 # (daily-fpp-compat.yml). Mirrors scan-new-submission.yml's pattern:
 #   /recheck - re-run this one plugin's scan fresh (e.g. after pushing a fix).
 #   /submit  - the owner disagrees with a finding; flag needs-manual-review for a
@@ -16,7 +16,7 @@
 # throughout this repo's CI (see check-submission-token.yml) rather than a label,
 # since GitHub silently drops template labels that don't exist on the repo.
 
-name: Recheck campaign tracking issue
+name: Automation - Recheck campaign tracking issue
 
 on:
   issue_comment:
@@ -68,19 +68,33 @@ jobs:
       - name: Resolve the plugin's registered owner
         id: owner
         if: steps.extract.outputs.name != '' && steps.extract.outputs.command != ''
+        env:
+          # REPO_NAME traces back to a \S+ regex match off the tracking issue body --
+          # pass via env/$VAR rather than ${{ }}-interpolated directly into the script,
+          # since ${{ }} splices raw text before bash parses it (see
+          # bug-fpp-data-ci-actions-script-injection-repo-name in .wolf/buglog.json).
+          REPO_NAME: ${{ steps.extract.outputs.name }}
         run: |
           python .github/scripts/resolve_plugin_owner.py \
-            --plugin-list pluginList.json --repo-name "${{ steps.extract.outputs.name }}"
+            --plugin-list pluginList.json --repo-name "$REPO_NAME"
 
       - name: Restrict /recheck and /submit to that owner
         id: authz
         if: steps.extract.outputs.name != '' && steps.extract.outputs.command != ''
         uses: actions/github-script@v7
+        env:
+          # PLUGIN_NAME/OWNER/COMMAND trace back to attacker-influenceable issue-body
+          # text -- pass via env/process.env rather than ${{ }}-interpolated directly
+          # into the script (see bug-fpp-data-ci-actions-script-injection-repo-name).
+          PLUGIN_NAME: ${{ steps.extract.outputs.name }}
+          OWNER: ${{ steps.owner.outputs.owner }}
+          COMMAND: ${{ steps.extract.outputs.command }}
         with:
           script: |
             const commenter = context.payload.comment.user.login;
-            const owner = '${{ steps.owner.outputs.owner }}';
-            const command = '${{ steps.extract.outputs.command }}';
+            const owner = process.env.OWNER;
+            const command = process.env.COMMAND;
+            const pluginName = process.env.PLUGIN_NAME;
             const { owner: repoOwner, repo } = context.repo;
 
             if (owner && commenter.toLowerCase() === owner.toLowerCase()) {
@@ -100,7 +114,7 @@ jobs:
             const issue_number = context.payload.issue.number;
             await github.rest.issues.createComment({
               owner: repoOwner, repo, issue_number,
-              body: `⚠️ @${commenter} only \`${{ steps.extract.outputs.name }}\`'s registered owner` +
+              body: `⚠️ @${commenter} only \`${pluginName}\`'s registered owner` +
                     (owner ? ` (**@${owner}**)` : '') +
                     ` or a fpp-data-ci maintainer can use \`/${command}\` on this tracking issue. If you ` +
                     `believe this is wrong, please contact a maintainer.`,
@@ -111,29 +125,41 @@ jobs:
         if: steps.authz.outputs.ok == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # REPO_NAME/TARGET_MAJOR trace back to attacker-influenceable issue-body text --
+          # pass via env/$VAR rather than ${{ }}-interpolated directly into the script.
+          REPO_NAME: ${{ steps.extract.outputs.name }}
+          TARGET_MAJOR: ${{ steps.extract.outputs.target }}
         run: |
           python .github/scripts/campaign_recheck_one.py \
             --plugin-list pluginList.json \
-            --repo-name "${{ steps.extract.outputs.name }}" \
-            --target-major "${{ steps.extract.outputs.target }}" \
+            --repo-name "$REPO_NAME" \
+            --target-major "$TARGET_MAJOR" \
             --schema .github/schema/pluginInfo.schema.json \
             --out recheck-result.json
 
       - name: Update the tracking issue
         if: steps.authz.outputs.ok == 'true'
         uses: actions/github-script@v7
+        env:
+          # PLUGIN_NAME/TARGET/COMMAND trace back to attacker-influenceable issue-body
+          # text -- pass via env/process.env rather than ${{ }}-interpolated directly
+          # into the script (see bug-fpp-data-ci-actions-script-injection-repo-name).
+          PLUGIN_NAME: ${{ steps.extract.outputs.name }}
+          TARGET: ${{ steps.extract.outputs.target }}
+          COMMAND: ${{ steps.extract.outputs.command }}
         with:
           script: |
             const fs = require('fs');
             const data = JSON.parse(fs.readFileSync('recheck-result.json', 'utf8'));
             const { owner, repo } = context.repo;
             const issue_number = context.payload.issue.number;
-            const target = '${{ steps.extract.outputs.target }}';
-            const command = '${{ steps.extract.outputs.command }}';
+            const pluginName = process.env.PLUGIN_NAME;
+            const target = process.env.TARGET;
+            const command = process.env.COMMAND;
 
             if (!data.found) {
               await github.rest.issues.createComment({ owner, repo, issue_number,
-                body: `⚠️ \`${{ steps.extract.outputs.name }}\` is no longer in \`pluginList.json\` - nothing to recheck.` });
+                body: `⚠️ \`${pluginName}\` is no longer in \`pluginList.json\` - nothing to recheck.` });
               return;
             }
             const r = data.result;

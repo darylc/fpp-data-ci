@@ -1,6 +1,6 @@
 # Daily FPP-major compatibility re-check.
 #
-# WHAT THIS IS: the lightweight counterpart to plugin-compliance-scan. It does NOT
+# WHAT THIS IS: the lightweight counterpart to 00-new-major-version-scan.yml. It does NOT
 # clone or lint - it just re-fetches each pluginInfo.json and re-evaluates whether a
 # versions[] entry now declares FPP-<major> support. When a plugin has become
 # compatible, its open tracking issue is commented and CLOSED automatically (verified,
@@ -9,7 +9,7 @@
 # Runs the campaign scanner in metadata-only mode (no --plugins-dir), so it's fast.
 # TARGET_MAJOR comes from the repo variable CAMPAIGN_TARGET_MAJOR (default 10).
 
-name: Daily FPP compatibility check
+name: Automation - Daily FPP compatibility check
 
 on:
   schedule:

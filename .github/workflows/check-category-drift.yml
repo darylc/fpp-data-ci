@@ -9,7 +9,7 @@
 # via query parameters under any circumstances, so there was nothing useful for that
 # page to carry - the submitter now picks Category directly on the real GitHub form.
 
-name: Check category drift
+name: Automation - Check category drift
 
 on:
   pull_request:

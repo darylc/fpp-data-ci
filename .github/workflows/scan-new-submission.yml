@@ -17,13 +17,14 @@
 # re-runs the scan against the (unchanged) issue body, re-fetching pluginInfo.json and
 # re-cloning the repo fresh each time so it sees whatever was just pushed.
 #
-# OVERRIDING: `needs-manual-review` is a "ready for a maintainer to look at this" flag,
-# not a "something's wrong" flag — so a failing scan does NOT add it. Most failures get
-# fixed and rechecked without ever needing a human in the loop. The label only appears
-# once the submission is actually ready: the scan passes, OR the submitter disagrees
-# with a finding and comments `/submit` to say so explicitly. `/submit` doesn't bypass
-# the scan silently — it still runs and still reports findings, it just adds the label
-# regardless of the result, with a note that the submitter chose to proceed anyway.
+# OVERRIDING: `/submit` doesn't bypass the scan silently — it still runs and still
+# reports findings, it just makes the submission "ready" (pass || /submit) regardless
+# of the result, with a note that the submitter chose to proceed anyway. "Ready" does
+# NOT mean the ISSUE gets a `needs-manual-review` label, though — every ready outcome
+# either closes the issue (a listing PR opens, where the maintainer's actual merge
+# decision happens; or the plugin's already listed) or is self-service (unknown
+# category — edit and `/recheck`), so there's no outcome where flagging the issue
+# itself for manual review would be correct.
 #
 # LISTING PR: the moment a submission is ready (pass or /submit), this also opens a PR
 # adding it to pluginList.json — add_plugin_entry.py. No further validation runs against
@@ -287,21 +288,18 @@ jobs:
             const issue_number = context.payload.issue.number;
             await github.rest.issues.createComment({ owner, repo, issue_number, body: full });
 
-            // needs-manual-review means "ready for a maintainer to look at this", so it
-            // only appears once the submission actually IS ready: pass, or an explicit
-            // /submit override. A plain failing scan adds nothing — most submitters fix
-            // and /recheck without ever needing a maintainer in the loop.
+            // needs-manual-review is NOT added here, even when ready: the maintainer's
+            // actual decision point is the listing PR opened below (ADDED), not this
+            // issue — which closes right along with it. The other two outcomes
+            // (ALREADY_LISTED) also close, and (UNKNOWN_CATEGORY) is self-service (edit
+            // the category, /recheck), not something needing a maintainer's judgement.
+            // So there's no outcome where labeling the ISSUE for manual review is
+            // actually correct — only ever clean up a stale label from a previous run.
             const ready = result.pass || isSubmitOverride;
-            if (ready) {
-              await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['needs-manual-review'] });
-            } else {
-              // Clear a stale "ready" label if an edit made a previously-passing/overridden
-              // submission start failing again — the label should never lie about status.
-              try {
-                await github.rest.issues.removeLabel({ owner, repo, issue_number, name: 'needs-manual-review' });
-              } catch (e) {
-                if (e.status !== 404) throw e;   // 404 = label wasn't there; fine
-              }
+            try {
+              await github.rest.issues.removeLabel({ owner, repo, issue_number, name: 'needs-manual-review' });
+            } catch (e) {
+              if (e.status !== 404) throw e;   // 404 = label wasn't there; fine
             }
             core.setOutput('ready', String(ready));
             // repoName/repoUrl are never taken from the issue body — both come from

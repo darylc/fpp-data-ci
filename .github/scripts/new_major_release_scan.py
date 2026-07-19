@@ -267,9 +267,6 @@ def issue_body(r, target, draft=True):
              f"the new version and outline any new best practices for plugins. Please review this "
              f"information and update your plugin accordingly.")
     L.append("")
-    L.append(f"Once you have updated your plugin, please comment `/recheck` on this issue and we will "
-             f"automatically scan your plugin and comment the new results here.")
-    L.append("")
     # compatibility
     if r["certified"]:
         L.append(f"### ✅ Compatibility\nA `versions[]` entry already declares FPP {target} support.")
@@ -296,10 +293,10 @@ def issue_body(r, target, draft=True):
     L.append(f"If you disagree with the assessment, please comment `/submit` and explain why you "
              f"disagree or believe your plugin deserves an exception, for the FPP maintainers to evaluate.")
     L.append("")
-    L.append(f"Want to sunset this plugin - submit removal request at {REMOVAL_GUIDED_PAGE}")
-    if not draft:
-        L.append("")
-        L.append("**Comment `/recheck` after pushing a fix to re-run this check.**")
+    L.append(f"Once you have updated your plugin, please comment `/recheck` on this issue and we will "
+             f"automatically scan your plugin and comment the new results here.")
+    L.append("")
+    L.append(f"Want to sunset this plugin? Submit removal request at {REMOVAL_GUIDED_PAGE}")
     return "\n".join(L)
 
 

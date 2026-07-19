@@ -1,4 +1,4 @@
-"""Re-run the campaign scan for ONE plugin, on demand — a tracking issue's /recheck
+"""Re-run the campaign scan for ONE plugin, on demand - a tracking issue's /recheck
 or /submit comment, rather than waiting for the next bulk campaign run
 (plugin-compliance-scan.yml) or the daily reconcile sweep (daily-fpp-compat.yml).
 
@@ -65,7 +65,7 @@ def main():
         json.dump({"found": True, "result": r, "body": issue_body(r, args.target_major, draft=False)}, f, indent=2)
 
     print(f"{r['status']}: B{r['num_blocker']} P{r['num_best_practice']} O{r['num_optional']}"
-          f"{'' if r['linted'] else '  (no clone — metadata only)'}")
+          f"{'' if r['linted'] else '  (no clone - metadata only)'}")
     return 0
 
 

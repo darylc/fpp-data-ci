@@ -161,21 +161,26 @@ jobs:
             if (result.repo_url) fields.push(`**Repo:** ${result.repo_url}`);
             if (result.owner) fields.push(`**Owner:** \`${result.owner}\``);
 
+            // Same reasoning as scan-new-submission.yml: a failed clone means the lint
+            // never ran, so there's nothing submitter-actionable to list - just prompt
+            // to try again rather than presenting a possibly-incomplete findings list.
+            const cloneFailed = findings.some(f => f.code === 'clone-failed');
+
             const lines = ['### 🔄 Recheck', ''];
             if (fields.length) lines.push(...fields, '');
-            if (result.pass) {
-              lines.push(`✅ Requested by @${commenter} — no blocking issues found.`);
+            if (cloneFailed) {
+              lines.push(`⚠️ Could not clone the repo to run the compliance checks (requested by @${commenter}) - ` +
+                         'this is often transient. Comment `/recheck` to try again.');
+            } else if (result.pass) {
+              lines.push(`✅ Requested by @${commenter} - no blocking issues found.`);
             } else {
-              lines.push(`Requested by @${commenter} — ${result.num_blocking} issue(s) currently outstanding:`, '');
+              lines.push(`Requested by @${commenter} - ${result.num_blocking} issue(s) currently outstanding:`, '');
               for (const f of findings) {
                 if (f.severity === 'optional') continue;
-                lines.push(`- ${badge[f.severity] || ''} **${label[f.severity] || f.severity} — ${f.code}** — ${f.message}`);
+                lines.push(`- ${badge[f.severity] || ''} **${label[f.severity] || f.severity} - ${f.code}** - ${f.message}`);
               }
             }
-            if (!result.linted && !result.already_listed) {
-              lines.push('', '_Note: could not clone the repo to run the static lint — only pluginInfo.json itself was checked._');
-            }
-            lines.push('', '_This comment reflects the repo\'s current state; it does not change the PR itself — merging is still a maintainer\'s call._');
+            lines.push('', '_This comment reflects the repo\'s current state; it does not change the PR itself - merging is still a maintainer\'s call._');
 
             const { owner, repo } = context.repo;
             const issue_number = context.payload.issue.number;
@@ -191,6 +196,6 @@ jobs:
             await github.rest.issues.createComment({
               owner, repo, issue_number,
               body: `⚠️ Could not find \`${{ steps.extract.outputs.repo_name }}\` in this branch's ` +
-                    `\`pluginList.json\` — the branch may have been hand-edited. A maintainer will need ` +
+                    `\`pluginList.json\` - the branch may have been hand-edited. A maintainer will need ` +
                     `to look at this manually.`,
             });

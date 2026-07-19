@@ -108,7 +108,7 @@ def validate_entry(entry, categories, info_schema, token, is_target, report):
     # --- fetch + schema-validate pluginInfo.json ---
     info, err = fetch_json(url)
     if err:
-        report_problem(name, f"cannot fetch pluginInfo.json — {err}")
+        report_problem(name, f"cannot fetch pluginInfo.json - {err}")
         return
     try:
         jsonschema.validate(info, info_schema)
@@ -140,10 +140,10 @@ def validate_entry(entry, categories, info_schema, token, is_target, report):
                     report_problem(name, f"srcURL repo {owner}/{repo} is private but pluginInfo does not declare private:true")
                 if data.get("archived"):
                     report.add(WARNING, name, f"srcURL repo {owner}/{repo} is archived")
-                # bugURL: warn (don't fail) if Issues are disabled — dead 'Report a Bug' link
+                # bugURL: warn (don't fail) if Issues are disabled - dead 'Report a Bug' link
                 bug = parse_github_repo(info.get("bugURL", ""))
                 if bug and bug == (owner, repo) and data.get("has_issues") is False:
-                    report.add(WARNING, name, f"Issues are disabled on {owner}/{repo} — the bugURL link won't work")
+                    report.add(WARNING, name, f"Issues are disabled on {owner}/{repo} - the bugURL link won't work")
 
         # --- at least one versions[] entry (schema enforces non-empty; here just note majors) ---
         versions = info.get("versions") or []
@@ -162,14 +162,14 @@ def build_markdown(report: Report, num_targets, total) -> str:
         return "\n".join(lines) + "\n"
 
     if report.errors:
-        lines.append(f"### ❌ {len(report.errors)} error(s) — must be fixed")
+        lines.append(f"### ❌ {len(report.errors)} error(s) - must be fixed")
         for f in report.errors:
-            lines.append(f"- **{f.entry}** — {f.message}")
+            lines.append(f"- **{f.entry}** - {f.message}")
         lines.append("")
     if report.warnings:
-        lines.append(f"### ⚠️ {len(report.warnings)} warning(s) — please review")
+        lines.append(f"### ⚠️ {len(report.warnings)} warning(s) - please review")
         for f in report.warnings:
-            lines.append(f"- **{f.entry}** — {f.message}")
+            lines.append(f"- **{f.entry}** - {f.message}")
         lines.append("")
     lines.append("_Errors block the check; warnings do not. See "
                  "[CONTRIBUTING.md](../blob/master/CONTRIBUTING.md) for the schema._")
@@ -211,14 +211,14 @@ def main() -> int:
 
     head = head_doc.get("pluginList", []) if isinstance(head_doc, dict) else []
 
-    # Duplicate repoName check (global — always an error).
+    # Duplicate repoName check (global - always an error).
     seen = {}
     for e in head:
         if isinstance(e, list) and e and isinstance(e[0], str):
             seen[e[0]] = seen.get(e[0], 0) + 1
     for nm, count in seen.items():
         if count > 1:
-            report.add(ERROR, nm, f"duplicate entry — appears {count} times")
+            report.add(ERROR, nm, f"duplicate entry - appears {count} times")
 
     categories = load_categories(args.categories)
 
@@ -226,7 +226,7 @@ def main() -> int:
     if args.base and os.path.exists(args.base):
         try:
             base = load_pluginlist(args.base)
-        except Exception:  # noqa: BLE001 — base unreadable => validate everything
+        except Exception:  # noqa: BLE001 - base unreadable => validate everything
             base = None
     targets = changed_repo_names(head, base)
 

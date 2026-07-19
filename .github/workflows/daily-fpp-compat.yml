@@ -1,7 +1,7 @@
 # Daily FPP-major compatibility re-check.
 #
 # WHAT THIS IS: the lightweight counterpart to plugin-compliance-scan. It does NOT
-# clone or lint — it just re-fetches each pluginInfo.json and re-evaluates whether a
+# clone or lint - it just re-fetches each pluginInfo.json and re-evaluates whether a
 # versions[] entry now declares FPP-<major> support. When a plugin has become
 # compatible, its open tracking issue is commented and CLOSED automatically (verified,
 # not self-reported). Authors are never @-mentioned; closing an issue notifies no one.

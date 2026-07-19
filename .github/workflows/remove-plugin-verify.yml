@@ -5,17 +5,17 @@
 # repo owner (from srcURL) and posts a sticky comment + a verdict label:
 #   owner-verified        submitter owns the repo (or it's archived/gone)
 #   ownership-unconfirmed  org repo → asks for proof (delist:true), or /submit to override
-#   not-listed              repoName isn't in pluginList.json at all — nothing to remove
+#   not-listed              repoName isn't in pluginList.json at all - nothing to remove
 #   removal-error          couldn't resolve the plugin for some other reason
 #
 # On `owner-verified` it goes straight on to remove the entry from
-# pluginList.json, commit it, and close the issue — no PR/review gate, since
+# pluginList.json, commit it, and close the issue - no PR/review gate, since
 # ownership is already established by that point.
 #
 # On `not-listed` there is by definition no listing to act on (see
 # verify_remove_plugin.py's `not_found` verdict), so the "Auto-close: not
 # listed" step below tags the reporter, points them at the new-listing form,
-# and closes the issue immediately — same as `owner-verified`, just skipping
+# and closes the issue immediately - same as `owner-verified`, just skipping
 # the removal step since there's nothing in pluginList.json to remove.
 #
 # WHY ONE WORKFLOW, NOT TWO: this used to be two workflows, with a second
@@ -24,10 +24,10 @@
 # GITHUB_TOKEN, and GitHub deliberately does not let GITHUB_TOKEN-authored
 # events trigger further workflow runs (anti-recursion protection). The apply
 # step was silently dead code. Doing both in the same job sidesteps that
-# entirely — there's no second event to fail to fire.
+# entirely - there's no second event to fail to fire.
 #
 # The issue title (including repoName) is set client-side by the guided page
-# (docs/submit_remove_plugin/) via the `title` prefill query param — same as
+# (docs/submit_remove_plugin/) via the `title` prefill query param - same as
 # scan-new-submission.yml, no server-side rename-after-creation here. A manually
 # opened issue (not via the guided page) just keeps the form's static default title.
 #
@@ -41,12 +41,17 @@
 #
 # OVERRIDING: if automated ownership verification won't confirm it (unconfirmed
 # or error) and the submitter believes that's wrong, `/submit` flags the issue
-# `needs-manual-review` for a maintainer to decide by hand instead — same idea
+# `needs-manual-review` for a maintainer to decide by hand instead - same idea
 # as scan-new-submission.yml's override, applied to the ownership question here
-# instead of a compliance scan.
+# instead of a compliance scan. `unconfirmed` specifically gets MORE than just a
+# label: `/submit` (or removal-escalation-sweep.yml's 7-day timeout, for anyone
+# who doesn't use it) opens a PR removing the entry from pluginList.json, so a
+# maintainer only has to merge or close it rather than edit the file by hand.
+# `error` doesn't get this -- ownership was never even resolved, so there's no
+# reliable repoName/owner pair to build a removal PR from.
 #
 # AUTHZ: /recheck and /submit only take effect from the issue's original
-# reporter — see the "Restrict..." step below. Anyone else gets told to open
+# reporter - see the "Restrict..." step below. Anyone else gets told to open
 # their own request instead of being able to act on someone else's.
 
 name: Verify plugin removal ownership
@@ -60,6 +65,7 @@ on:
 permissions:
   contents: write
   issues: write
+  pull-requests: write
 
 jobs:
   verify:
@@ -114,7 +120,7 @@ jobs:
               return;
             }
             // Repo maintainers (push/maintain/admin on fpp-data-ci) can also trigger
-            // this, not just the original reporter — e.g. to help someone stuck, or
+            // this, not just the original reporter - e.g. to help someone stuck, or
             // recheck after fixing something on the submitter's behalf.
             try {
               const perm = await github.rest.repos.getCollaboratorPermissionLevel({ owner, repo, username: commenter });
@@ -179,9 +185,9 @@ jobs:
               await github.rest.issues.createComment({owner, repo, issue_number, body});
             }
 
-            // verdict label (swap the five, keep whatever else is there)
+            // verdict label (swap the four, keep whatever else is there)
             const verdict = '${{ steps.verify.outputs.verdict }}';
-            const map = {verified: 'owner-verified', unconfirmed: 'ownership-unconfirmed', not_found: 'not-listed', error: 'removal-error', report: 'removal-report'};
+            const map = {verified: 'owner-verified', unconfirmed: 'ownership-unconfirmed', not_found: 'not-listed', error: 'removal-error'};
             const want = map[verdict];
             for (const l of Object.values(map)) {
               if (l !== want) {
@@ -209,7 +215,7 @@ jobs:
       - name: /submit override
         if: >-
           steps.authz.outputs.ok == 'true' && steps.authz.outputs.command == 'submit' &&
-          steps.verify.outputs.verdict != 'verified'
+          steps.verify.outputs.verdict != 'verified' && steps.verify.outputs.verdict != 'unconfirmed'
         uses: actions/github-script@v7
         with:
           script: |
@@ -217,7 +223,7 @@ jobs:
             const issue_number = context.issue.number;
             await github.rest.issues.addLabels({owner, repo, issue_number, labels: ['needs-manual-review']});
             await github.rest.issues.createComment({owner, repo, issue_number,
-              body: 'Flagged for manual review — the reporter used `/submit` to ask a maintainer to ' +
+              body: 'Flagged for manual review - the reporter used `/submit` to ask a maintainer to ' +
                     'decide despite automated ownership verification not confirming this directly.'});
 
       - name: "Auto-close: not listed"
@@ -235,7 +241,7 @@ jobs:
             const repoName = process.env.REPO_NAME;
             await github.rest.issues.createComment({owner, repo, issue_number,
               body: `@${author} Thanks for the report. \`${repoName}\` isn't currently in our ` +
-                    `plugin listing (\`pluginList.json\`), so there's nothing to remove here — the ` +
+                    `plugin listing (\`pluginList.json\`), so there's nothing to remove here - the ` +
                     `automated check above confirms it can't find a matching entry.\n\n` +
                     `If you believe this plugin *should* be listed (or you meant a different/renamed ` +
                     `repo), please submit a new listing request via the guided form: ` +
@@ -243,6 +249,98 @@ jobs:
                     `Closing this one out since there's no existing listing to act on. If this is ` +
                     `wrong, comment \`/submit\` and we'll flag it for a maintainer instead.`});
             await github.rest.issues.update({owner, repo, issue_number, state: 'closed'});
+
+      # --- unconfirmed ownership, escalated via /submit -------------------------
+      # (removal-escalation-sweep.yml does the equivalent for anyone who doesn't
+      # /submit and instead lets the 7-day window mentioned in the verdict message
+      # elapse -- same branch-naming convention, same PR shape, so either path
+      # converges on updating the same PR rather than creating duplicates.)
+
+      - name: "Escalate unconfirmed ownership: remove entry on a branch"
+        id: escalate
+        if: >-
+          steps.authz.outputs.ok == 'true' && steps.authz.outputs.command == 'submit' &&
+          steps.verify.outputs.verdict == 'unconfirmed'
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          BRANCH="remove-plugin/${{ steps.verify.outputs.repo_name }}"
+          git checkout -B "$BRANCH"
+
+          OUT=$(python .github/scripts/remove_plugin_entry.py \
+            --plugin-list pluginList.json \
+            --repo-name "${{ steps.verify.outputs.repo_name }}") || true
+          echo "$OUT"
+          {
+            echo "status<<EOF"
+            echo "$OUT"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+          if [[ "$OUT" == removed:* ]]; then
+            git add pluginList.json
+            git commit -m "Remove ${{ steps.verify.outputs.repo_name }} (escalated from issue #${{ github.event.issue.number }})"
+            git push -f origin "$BRANCH"
+          fi
+
+      - name: Open or update escalation PR
+        if: >-
+          steps.authz.outputs.ok == 'true' && steps.authz.outputs.command == 'submit' &&
+          steps.verify.outputs.verdict == 'unconfirmed' && startsWith(steps.escalate.outputs.status, 'removed')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.issue.number;
+            const repoName = '${{ steps.verify.outputs.repo_name }}';
+            const branch = '${{ steps.escalate.outputs.branch }}';
+            const registeredOwner = '${{ steps.verify.outputs.owner }}';
+            const reporter = context.payload.issue.user.login;
+
+            const lines = [
+              `Removes \`${repoName}\` from \`pluginList.json\` — ownership could not be automatically ` +
+              `confirmed for removal request #${issue_number}, so this was escalated via \`/submit\`.`,
+              '',
+            ];
+            if (registeredOwner) lines.push(`**Registered owner (from srcURL):** \`${registeredOwner}\``);
+            lines.push(`**Requested by:** @${reporter}`, '');
+            lines.push(
+              '⚠️ **Ownership was NOT verified** — the reporter\'s GitHub login did not match the ' +
+              'registered owner above, and no `"delist": true` proof-of-control was pushed. This PR ' +
+              'exists so a maintainer can decide by hand rather than having to edit `pluginList.json` ' +
+              'manually.',
+              '',
+              '**Merging removes the plugin. Closing rejects the request.** Neither happens automatically.');
+            const body = lines.join('\n');
+
+            const existing = await github.rest.pulls.list({ owner, repo, head: `${owner}:${branch}`, state: 'open' });
+            let pr = existing.data[0];
+            if (!pr) {
+              const created = await github.rest.pulls.create({
+                owner, repo, title: `[Plugin] Remove ${repoName}`, body, head: branch, base: 'master',
+              });
+              pr = created.data;
+              try { await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels: ['needs-manual-review'] }); } catch (e) {}
+            } else {
+              // Keep the body fresh -- a later /recheck-then-/submit cycle (e.g. after
+              // an edit) may change the registered owner or requester context.
+              await github.rest.pulls.update({ owner, repo, pull_number: pr.number, body });
+            }
+
+            const MARKER = '<!-- removal-escalation-pr -->';
+            const comments = await github.rest.issues.listComments({ owner, repo, issue_number });
+            const existingComment = comments.data.find(c => c.body && c.body.includes(MARKER));
+            const commentBody = `${MARKER}\n📦 Escalation PR: ${pr.html_url}\n\nClosing this issue — ` +
+              'further discussion happens on the PR now. Merging (removes the plugin) or closing ' +
+              '(rejects the request) is a maintainer\'s call, not automatic.';
+            if (existingComment) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existingComment.id, body: commentBody });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body: commentBody });
+            }
+            await github.rest.issues.update({ owner, repo, issue_number, state: 'closed' });
 
       # --- from here on: only for a verified removal ---------------------------
 

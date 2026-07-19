@@ -1,12 +1,12 @@
 # Guards the submission issue queue.
 #
-# WHY: the guided page (docs/submit_new_plugin/) is the only supported way to submit — it encrypts the
+# WHY: the guided page (docs/submit_new_plugin/) is the only supported way to submit - it encrypts the
 # author's email before it ever reaches this public repo. But the underlying Issue Form is
 # always reachable directly (GitHub has no way to hide a template), so people will land on it
 # and fill it in by hand. This check catches that and points them at the guided page.
 #
 # IT ALSO CATCHES THE WORST CASE: someone typing their email address into the token field.
-# That address is ALREADY public by the time this runs — the issue is live the instant it is
+# That address is ALREADY public by the time this runs - the issue is live the instant it is
 # submitted. We cannot un-publish it, so the comment tells them to delete the issue and treat
 # the address as exposed. This limits damage; it cannot prevent it.
 #
@@ -25,7 +25,7 @@ permissions:
 jobs:
   check:
     # Identify submissions by BODY SHAPE, not by label. GitHub silently drops labels
-    # declared in an issue template when they don't exist in the repo — a label filter
+    # declared in an issue template when they don't exist in the repo - a label filter
     # here would mean this guard never runs and nobody notices.
     if: contains(github.event.issue.body, '### Contact token')
     runs-on: ubuntu-latest
@@ -39,7 +39,7 @@ jobs:
             const body = context.payload.issue.body || '';
 
             // Issue Forms render as '### Label\n\nvalue'. Pull the token field out.
-            // NOTE: no \Z here — JavaScript regex has no \Z (that's Python). Using it
+            // NOTE: no \Z here - JavaScript regex has no \Z (that's Python). Using it
             // matches a literal "Z", the match fails, and EVERY issue silently looks
             // like it has no token. Split on the headings instead; it can't rot.
             let val = '';
@@ -56,7 +56,7 @@ jobs:
             const missing = !val || val === '_No response_';
             const malformed = !missing && !isEmail && !val.startsWith('FPPC1:');
 
-            // Mention the reporter directly — see scan-new-submission.yml for why this
+            // Mention the reporter directly - see scan-new-submission.yml for why this
             // differs from the campaign scanner's no-mention policy: this is a direct
             // reply to an issue the person just opened themselves.
             const reporter = context.payload.issue.user.login;
@@ -78,7 +78,7 @@ jobs:
               ].join('\n');
             } else if (missing) {
               msg = [
-                '### Almost — this submission has no contact token',
+                '### Almost - this submission has no contact token',
                 '',
                 `@${reporter} please re-submit using the **[guided submission page](${GUIDE})**. It fills this form in`,
                 'for you and encrypts your contact email so it never appears publicly.',
@@ -86,7 +86,7 @@ jobs:
                 'Without a token we have no way to reach you about a security problem or a breaking',
                 'change in a future FPP release, so submissions without one are not merged.',
                 '',
-                '**Do not paste your email address here** — this issue is public.',
+                '**Do not paste your email address here** - this issue is public.',
               ].join('\n');
             } else if (malformed) {
               msg = [
@@ -109,7 +109,7 @@ jobs:
               if (existing) {
                 await github.rest.issues.updateComment({
                   owner, repo, comment_id: existing.id,
-                  body: `${MARKER}\n✅ Contact token looks good — thanks!`,
+                  body: `${MARKER}\n✅ Contact token looks good - thanks!`,
                 });
               }
               return;

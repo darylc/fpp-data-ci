@@ -60,7 +60,7 @@ jobs:
             --base base_pluginList.json \
             --output validation-report.md
 
-      # Post/update a sticky PR comment with the report — runs even if validation failed.
+      # Post/update a sticky PR comment with the report - runs even if validation failed.
       # actions/github-script is first-party (maintained by GitHub).
       - name: Comment report on PR
         if: always() && github.event_name == 'pull_request'
@@ -71,7 +71,7 @@ jobs:
             const marker = '<!-- plugin-list-validation -->';
             let body = marker + '\n';
             try { body += fs.readFileSync('validation-report.md', 'utf8'); }
-            catch { body += '## Plugin list validation\n\n⚠️ The validator did not produce a report (it may have crashed — check the run log).'; }
+            catch { body += '## Plugin list validation\n\n⚠️ The validator did not produce a report (it may have crashed - check the run log).'; }
 
             const {owner, repo} = context.repo;
             const issue_number = context.issue.number;

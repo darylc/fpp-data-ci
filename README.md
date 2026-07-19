@@ -2,27 +2,27 @@
 
 This repository is the data backing FPP's Plugin Manager:
 
-- **`pluginList.json`** — the master index of community plugins. Each entry
+- **`pluginList.json`** - the master index of community plugins. Each entry
   points at a plugin's `pluginInfo.json` (hosted in the plugin's own repo),
   which FPP fetches to list, version-check, and install it.
-- **`pluginCategories.json`** — the canonical category list plugins can tag
+- **`pluginCategories.json`** - the canonical category list plugins can tag
   themselves with.
 
 ## Submitting a plugin
 
-See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the full guide — pre-submission
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the full guide - pre-submission
 guidelines, the `pluginInfo.json` contract, the `pluginList.json` entry
 format, and what CI checks automatically. Two ways in:
 
 1. **[Submit a plugin](https://darylc.github.io/fpp-data-ci/submit_new_plugin/)**
-   (Issue Form, no git needed) — the guided page fills in the form for you and
+   (Issue Form, no git needed) - the guided page fills in the form for you and
    encrypts your contact email.
-2. **Pull Request** — add your entry to `pluginList.json` directly; a CI
+2. **Pull Request** - add your entry to `pluginList.json` directly; a CI
    check validates it and comments on the PR.
 
 Building the plugin itself? Start from
 [fpp-plugin-Template](https://github.com/FalconChristmas/fpp-plugin-Template)
-— it has the `pluginInfo.json` format reference, plugin guidelines, and a
+- it has the `pluginInfo.json` format reference, plugin guidelines, and a
 working skeleton to fork.
 
 ## Removing a plugin

@@ -2,14 +2,14 @@
 
 For a target FPP major, walks every entry in pluginList.json and, per plugin:
   * evaluates whether any versions[] entry declares compatibility with the major
-    (the implicit "certified for FPP <major>" signal — D21),
+    (the implicit "certified for FPP <major>" signal - D21),
   * runs the static compliance linter (lint_plugin.py) over its cloned tree,
   * gathers repo metadata (Issues enabled?, archived?, last push) best-effort
     from the GitHub API,
 and emits:
-  * dashboard.md   — one status row per plugin,
-  * issues/<repo>.md — a per-plugin draft tracking-issue body,
-  * summary.json   — machine-readable results.
+  * dashboard.md   - one status row per plugin,
+  * issues/<repo>.md - a per-plugin draft tracking-issue body,
+  * summary.json   - machine-readable results.
 
 DRY RUN BY DESIGN: this never creates issues and never @-mentions an author.
 Maintainer handles are written as plain text (no leading @), so even if a body
@@ -32,7 +32,7 @@ from lint_plugin import lint_plugin_dir, BLOCKER, BEST_PRACTICE, OPTIONAL
 
 GUIDELINES = "https://github.com/FalconChristmas/fpp-plugin-Template/blob/master/PLUGIN_GUIDELINES.md"
 FORMAT_DOC = "https://github.com/FalconChristmas/fpp-plugin-Template/blob/master/PLUGININFO_FORMAT.md"
-# SANDBOX URLs — swap to FalconChristmas/fpp-data (and its Pages equivalent) when
+# SANDBOX URLs - swap to FalconChristmas/fpp-data (and its Pages equivalent) when
 # promoting upstream (same convention as the guided pages and Issue Form links
 # elsewhere in this repo).
 REMOVAL_FORM = "https://github.com/darylc/fpp-data-ci/issues/new?template=submit_remove_plugin.yml"
@@ -50,7 +50,7 @@ def compatible_with_major(versions, m: int) -> bool:
     """Is any versions[] entry certified for FPP major `m`?
 
     Mirrors the Plugin Manager's own logic (D21): an OPEN-ended max ("0"/""/"0.0")
-    only certifies the major the entry was built for — an open entry built for an
+    only certifies the major the entry was built for - an open entry built for an
     OLDER major shows as "untested" on a newer one, not compatible. A CLOSED range
     certifies `m` when min-major <= m <= max-major.
     """
@@ -109,7 +109,7 @@ def scan_plugin(entry, target, plugins_dir, token, schema):
     if err:
         findings.append((BLOCKER, "plugininfo", err))
 
-    # Schema validation — shared with scan_submission.py (and validate_pluginlist.py's
+    # Schema validation - shared with scan_submission.py (and validate_pluginlist.py's
     # ERROR/WARNING model separately) via lib_plugin_schema.schema_validation_error().
     if info and schema:
         schema_err = lib.schema_validation_error(info, schema)
@@ -118,12 +118,12 @@ def scan_plugin(entry, target, plugins_dir, token, schema):
 
     # --- author-requested removal (machine signal / proof-of-control) --------
     # NOTE: "delist" is pluginInfo.schema.json's actual field name (an external
-    # contract plugin authors' own repos already use) — do not rename the key itself,
+    # contract plugin authors' own repos already use) - do not rename the key itself,
     # only the surrounding prose/identifiers.
     removal_requested = bool(info.get("delist"))
     if removal_requested:
         findings.append((OPTIONAL, "removal-requested",
-                         "author set \"delist\": true in pluginInfo.json — plugin removal requested"))
+                         "author set \"delist\": true in pluginInfo.json - plugin removal requested"))
 
     # --- version compatibility (the primary campaign signal) ----------------
     versions = info.get("versions") or []
@@ -183,20 +183,20 @@ def issue_body(r, target, draft=True):
     L = []
     L.append(f"<!-- plugin:{r['name']} campaign:fpp{target} -->")
     if draft:
-        L.append(f"> **DRY RUN — draft only. The maintainer has NOT been notified.**")
+        L.append(f"> **DRY RUN - draft only. The maintainer has NOT been notified.**")
         L.append("")
-    L.append(f"## {r['name']} — FPP {target} readiness")
+    L.append(f"## {r['name']} - FPP {target} readiness")
     if r["owner"]:
-        mention = "not @-mentioned in this dry run" if draft else "not @-mentioned — see MENTION_OWNER"
+        mention = "not @-mentioned in this dry run" if draft else "not @-mentioned - see MENTION_OWNER"
         L.append(f"Maintainer: `{r['owner']}` (https://github.com/{r['owner']}) *({mention})*")
     L.append("")
-    L.append(f"> ℹ️ FPP's plugin **submission** and **removal** process has been streamlined — see the "
+    L.append(f"> ℹ️ FPP's plugin **submission** and **removal** process has been streamlined - see the "
              f"[Plugin Guidelines]({GUIDELINES}) for what's expected of a listed plugin. Adding another "
              f"plugin? Start at the [guided submission page]({SUBMISSION_GUIDED_PAGE}).")
     L.append("")
     if r["status"] == "unmaintained":
         push = f"{r['months_since_push']} months" if r["months_since_push"] is not None else "a long time"
-        L.append(f"> 💤 No activity in {push} — if you'd like to remove this plugin instead of "
+        L.append(f"> 💤 No activity in {push} - if you'd like to remove this plugin instead of "
                  f"updating it, start at the [guided removal page]({REMOVAL_GUIDED_PAGE}) or open a "
                  f"[Request Plugin Removal]({REMOVAL_FORM}) issue and we'll remove it from the list, "
                  f"no update needed.")
@@ -222,14 +222,14 @@ def issue_body(r, target, draft=True):
         badge = {BLOCKER: "🛑", BEST_PRACTICE: "⚠️", OPTIONAL: "💡"}
         label = {BLOCKER: "Blocker", BEST_PRACTICE: "Best practice", OPTIONAL: "Optional"}
         for sev, code, msg in sorted(r["findings"], key=lambda f: order.get(f[0], 3)):
-            L.append(f"- {badge.get(sev, '')} **{label.get(sev, sev)} — {code}** — {msg}")
+            L.append(f"- {badge.get(sev, '')} **{label.get(sev, sev)} - {code}** - {msg}")
         L.append("")
     L.append(f"Please review the [Plugin Guidelines]({GUIDELINES}) and "
              f"[pluginInfo.json format]({FORMAT_DOC}).")
     L.append("")
     L.append(f"**Removing this plugin instead?** Start at the [guided removal page]"
              f"({REMOVAL_GUIDED_PAGE}) (fills in the repoName for you), or open a "
-             f"[Request Plugin Removal]({REMOVAL_FORM}) issue directly — we'll remove it from the "
+             f"[Request Plugin Removal]({REMOVAL_FORM}) issue directly - we'll remove it from the "
              f"list, no update needed.")
     if not draft:
         L.append("")
@@ -240,7 +240,7 @@ def issue_body(r, target, draft=True):
 def build_dashboard(results, target):
     total = len(results)
     by = lambda s: sum(1 for r in results if r["status"] == s)
-    L = [f"# FPP {target} plugin readiness — {datetime.now(timezone.utc):%Y-%m-%d}",
+    L = [f"# FPP {target} plugin readiness - {datetime.now(timezone.utc):%Y-%m-%d}",
          "",
          f"{total} plugins · ✅ {by('compatible')} compatible · "
          f"🔧 {by('needs-update')} need update · 💤 {by('unmaintained')} unmaintained",
@@ -284,7 +284,7 @@ def main():
             f.write(issue_body(r, args.target_major))
         print(f"{ICON.get(r['status'],'')} {r['name']:34} {r['status']:13} "
               f"B{r['num_blocker']} P{r['num_best_practice']} O{r['num_optional']}"
-              f"{'' if r['linted'] else '  (no clone — metadata only)'}")
+              f"{'' if r['linted'] else '  (no clone - metadata only)'}")
 
     with open(os.path.join(args.out, "dashboard.md"), "w", encoding="utf-8") as f:
         f.write(build_dashboard(results, args.target_major))

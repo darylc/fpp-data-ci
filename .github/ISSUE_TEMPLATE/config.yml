@@ -8,14 +8,14 @@ contact_links:
   # PRE-FILLED link to the "Submit a plugin" form below, so nothing is copy-pasted.
   # Issue Forms are static YAML and cannot run JS, which is why this is a separate
   # page rather than a step inside the form itself.
-  # SANDBOX URL — swap to https://falconchristmas.github.io/fpp-data/contact/ upstream.
+  # SANDBOX URL - swap to https://falconchristmas.github.io/fpp-data/contact/ upstream.
   #
   # Contribution Guidelines / FPP Facebook Group / FPP Plugin Template links were
-  # dropped from this chooser (2026-07-18) — they clutter the "New issue" screen and
+  # dropped from this chooser (2026-07-18) - they clutter the "New issue" screen and
   # are already linked from within the plugin-submission.yml form body.
-  - name: ⚡ Submit a plugin — start here (guided)
+  - name: ⚡ Submit a plugin - start here (guided)
     url: https://darylc.github.io/fpp-data-ci/submit_new_plugin/
     about: Recommended. Fills in the submission form for you and encrypts your contact email.
-  - name: 🗑️ Request Plugin Removal — start here (guided)
+  - name: 🗑️ Request Plugin Removal - start here (guided)
     url: https://darylc.github.io/fpp-data-ci/submit_remove_plugin/
-    about: Fills in the repoName for you. No email involved, so it's a single step — no encryption needed.
+    about: Fills in the repoName for you. No email involved, so it's a single step - no encryption needed.

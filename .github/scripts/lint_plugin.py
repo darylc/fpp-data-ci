@@ -2,15 +2,15 @@
 
 Runs the guideline/hygiene checks (the "areas of concern / optimisation"
 surfaced in a release-readiness scan) against a plugin's cloned directory.
-Pure standard library, no clone/network here — the caller provides a path.
+Pure standard library, no clone/network here - the caller provides a path.
 
 Each check yields a Finding(severity, code, message). Severities:
-  blocker        — dangerous or breaks FPP/other users (reboots the box, kills a running
+  blocker        - dangerous or breaks FPP/other users (reboots the box, kills a running
                    show, remote code exec, world-writable, corrupts the system Python,
                    bypasses the stable API contract)
-  best-practice  — against the guidelines but not dangerous (sudo in a script, no
+  best-practice  - against the guidelines but not dangerous (sudo in a script, no
                    `set -e`, no uninstall script, CRLF line endings)
-  optional       — polish (missing LICENSE/README, no bugURL)
+  optional       - polish (missing LICENSE/README, no bugURL)
 
 Reference: PLUGIN_GUIDELINES.md and PLUGININFO_FORMAT.md in fpp-plugin-Template.
 
@@ -78,7 +78,7 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
     """Run all static checks against a plugin working tree; return findings.
 
     `info` is the plugin's already-parsed pluginInfo.json, if the caller has it (both
-    campaign_scan.py and scan_submission.py load it anyway) — used for checks that need
+    campaign_scan.py and scan_submission.py load it anyway) - used for checks that need
     to cross-reference the manifest against the working tree, like the icon check.
     """
     out: list[Finding] = []
@@ -95,32 +95,32 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
     hit = first(r'(curl|wget)\b[^|]*\|[^|]*(sudo\s+)?(bash|sh)\b')
     if hit:
         out.append(Finding(BLOCKER, "remote-exec",
-                   f"pipes a remote script into a shell ({hit[0]}:{hit[1]}: `{hit[2]}`) — declare "
+                   f"pipes a remote script into a shell ({hit[0]}:{hit[1]}: `{hit[2]}`) - declare "
                    f"a dependency, or download to a file, verify its checksum, then run it, e.g. "
                    f"`curl -fsSLo installer.sh https://example.com/install.sh && "
                    f"echo \"<sha256>  installer.sh\" | sha256sum -c && bash installer.sh`"))
 
     # Reboots/shutdowns are an error. A bare reboot/shutdown only counts as a
     # command (start of line / after ;&| / sudo / then|do, in a shell script, or
-    # wrapped in system()/exec()) — not the word "Reboot" in UI text.
+    # wrapped in system()/exec()) - not the word "Reboot" in UI text.
     hit = (next(iter(_grep(root, r'(^|[;&|]|\bsudo\s+|\bthen\s+|\bdo\s+)\s*(reboot|shutdown|halt)\b',
                            exts=(".sh",))), None)
            or first(r'(system|exec|shell_exec|passthru|popen)\s*\([^)]*\b(reboot|shutdown)\b'))
     if hit:
         out.append(Finding(BLOCKER, "reboot",
-                   f"reboots/shuts down the box ({hit[0]}:{hit[1]}: `{hit[2]}`) — replace it with "
+                   f"reboots/shuts down the box ({hit[0]}:{hit[1]}: `{hit[2]}`) - replace it with "
                    f"`setSetting rebootFlag 1` (shell) or the equivalent in your language, so FPP "
                    f"reboots on its own schedule instead of pulling the box down mid-show"))
 
     # Restarting fppd DIRECTLY (RestartFPPD(), systemctl/service/kill, `fpp -r`) is
     # the anti-pattern. The sanctioned way is SetRestartFlag()/`setSetting restartFlag`
-    # (deferred, sequenced around a running show) — those are NOT flagged.
+    # (deferred, sequenced around a running show) - those are NOT flagged.
     hit = first(r'\bRestartFPPD\s*\(|\bfppd_restart\b|systemctl\s+(restart|stop|start)\s+fppd'
                 r'|service\s+fppd\s+(restart|stop)|(pkill|killall)\s+[^\n]*fppd|\bfpp\s+-r\b|\bfpp\s+--restart\b'
                 r'|/api/system/fppd/(restart|reboot)|api/system/restart')
     if hit:
         out.append(Finding(BLOCKER, "fppd-restart",
-                   f"restarts fppd directly ({hit[0]}:{hit[1]}: `{hit[2]}`) — replace it with "
+                   f"restarts fppd directly ({hit[0]}:{hit[1]}: `{hit[2]}`) - replace it with "
                    f"`setSetting restartFlag 1` (shell) or `SetRestartFlag()` (C++), so FPP "
                    f"restarts safely between sequences instead of killing a running show"))
 
@@ -130,7 +130,7 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
     hit = first(r'https?://(localhost|127\.0\.0\.1|0\.0\.0\.0):32322')
     if hit:
         out.append(Finding(BLOCKER, "fppd-port",
-                   f"calls fppd's internal port :32322 directly ({hit[0]}:{hit[1]}: `{hit[2]}`) — "
+                   f"calls fppd's internal port :32322 directly ({hit[0]}:{hit[1]}: `{hit[2]}`) - "
                    f"replace `http://localhost:32322/...` with the proxied, documented equivalent "
                    f"at `http://localhost/api/...` instead"))
 
@@ -138,18 +138,18 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
     if hit:
         out.append(Finding(BLOCKER, "break-system-packages",
                    f"pip --break-system-packages corrupts the system Python ({hit[0]}:{hit[1]}: "
-                   f"`{hit[2]}`) — create a venv inside your plugin directory instead, e.g. "
+                   f"`{hit[2]}`) - create a venv inside your plugin directory instead, e.g. "
                    f"`python3 -m venv \"$SCRIPT_DIR/venv\" && \"$SCRIPT_DIR/venv/bin/pip\" install ...`, "
                    f"then call `\"$SCRIPT_DIR/venv/bin/python3\"` from your plugin code"))
 
     # Reading/parsing FPP's raw core config directly (the settings file, channel
-    # outputs) is fragile — use getSetting()/$settings/the API. Writing your OWN
+    # outputs) is fragile - use getSetting()/$settings/the API. Writing your OWN
     # config via WriteSettingToFile(key, val, pluginName) is fine and NOT flagged.
     hit = first(r'''(open|file_get_contents|fopen|fgets|cat)\s*\(?\s*['"]?[^'"\n]*media/settings\b'''
                 r'''|['"][^'"\n]*/(channeloutputs|co-universes|co-pixelStrings)\.json''')
     if hit:
         out.append(Finding(BLOCKER, "core-config",
-                   f"reads/writes FPP core config directly ({hit[0]}:{hit[1]}: `{hit[2]}`) — read "
+                   f"reads/writes FPP core config directly ({hit[0]}:{hit[1]}: `{hit[2]}`) - read "
                    f"it through `getSetting('settingName')` (PHP) or the `/api/settings/<name>` "
                    f"endpoint instead of parsing the settings file yourself; the file's format is "
                    f"not a stable contract across FPP releases"))
@@ -157,7 +157,7 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
     hit = first(r'chmod\s+(-R\s+)?(777|666|a\+w|o\+w)\b')
     if hit:
         out.append(Finding(BLOCKER, "world-writable",
-                   f"loosens permissions to world-writable ({hit[0]}:{hit[1]}: `{hit[2]}`) — since "
+                   f"loosens permissions to world-writable ({hit[0]}:{hit[1]}: `{hit[2]}`) - since "
                    f"install/hooks already run as root, scope the permission to just the owner or "
                    f"group that needs it (e.g. `chmod 750` for a directory another service-user "
                    f"reads, or `chown` that user instead of opening it to everyone)"))
@@ -165,7 +165,7 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
     hit = first(r'\bsudo\b', exts=(".sh",))
     if hit:
         out.append(Finding(BEST_PRACTICE, "sudo",
-                   f"uses sudo in a script ({hit[0]}:{hit[1]}: `{hit[2]}`) — install/hooks already "
+                   f"uses sudo in a script ({hit[0]}:{hit[1]}: `{hit[2]}`) - install/hooks already "
                    f"run as root, so remove the sudo call and run the command directly, e.g. "
                    f"`{hit[2].replace('sudo ', '', 1)}`"))
 
@@ -175,7 +175,7 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
         head = _read(path).splitlines()
         if not head or not head[0].startswith("#!"):
             out.append(Finding(BEST_PRACTICE, "no-shebang",
-                       f"{rel} has no shebang line — add `#!/bin/bash` (or `#!/bin/sh`) as its "
+                       f"{rel} has no shebang line - add `#!/bin/bash` (or `#!/bin/sh`) as its "
                        f"first line so it runs with a known shell regardless of how it's invoked"))
         try:
             with open(path, "rb") as f:
@@ -185,7 +185,7 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
         lines_with_cr = [i for i, line in enumerate(raw_lines, 1) if line.endswith(b"\r")]
         if lines_with_cr:
             out.append(Finding(BEST_PRACTICE, "crlf",
-                       f"{rel}:{lines_with_cr[0]} has CRLF line endings — breaks bash (the `\\r` "
+                       f"{rel}:{lines_with_cr[0]} has CRLF line endings - breaks bash (the `\\r` "
                        f"becomes part of the command). Fix with `sed -i 's/\\r$//' {rel}` or "
                        f"`dos2unix {rel}`, and configure your editor/git to use LF"))
 
@@ -199,7 +199,7 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
                 if not os.access(p, os.X_OK):
                     sev = BLOCKER if fn.startswith(("preStart", "postStart", "preStop", "postStop")) else BEST_PRACTICE
                     out.append(Finding(sev, "exec-bit",
-                               f"{os.path.relpath(p, root)} is not executable — commit it +x "
+                               f"{os.path.relpath(p, root)} is not executable - commit it +x "
                                f"(git update-index --chmod=+x)"))
 
     # install error handling
@@ -209,7 +209,7 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
             body = _read(p)
             if not re.search(r'set\s+-e|set\s+-euo|\|\|\s*exit', body):
                 out.append(Finding(BEST_PRACTICE, "no-set-e",
-                           f"{cand} has no 'set -e' (or `|| exit`) — without it, bash keeps running "
+                           f"{cand} has no 'set -e' (or `|| exit`) - without it, bash keeps running "
                            f"the rest of the script even after a command fails, so if an earlier "
                            f"step errors out (e.g. a dependency install fails), later steps still "
                            f"run against that broken state and the plugin ends up half-installed "
@@ -226,12 +226,12 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
         if bad_hit:
             out.append(Finding(BEST_PRACTICE, "log-location",
                        f"writes a log outside FPP's logs directory ({bad_hit[0]}:{bad_hit[1]}: "
-                       f"`{bad_hit[2]}`) — use <logdir>/plugin-{repo}.log so it is rotated and in "
+                       f"`{bad_hit[2]}`) - use <logdir>/plugin-{repo}.log so it is rotated and in "
                        f"the Support Zip"))
 
     # --- repo hygiene --------------------------------------------------------
     if not any(n.startswith(("license", "copying")) for n in lower):
-        out.append(Finding(OPTIONAL, "no-license", "no LICENSE file — add one for redistribution clarity"))
+        out.append(Finding(OPTIONAL, "no-license", "no LICENSE file - add one for redistribution clarity"))
     if not any(n.startswith("readme") for n in lower):
         out.append(Finding(OPTIONAL, "no-readme", "no README file"))
 
@@ -242,7 +242,7 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
     has_icon_url = bool((info or {}).get("iconURL"))
     if "icon.png" not in lower and not has_icon_url:
         out.append(Finding(OPTIONAL, "no-icon",
-                   "no icon.png in the repo root and no iconURL in pluginInfo.json — the Plugin "
+                   "no icon.png in the repo root and no iconURL in pluginInfo.json - the Plugin "
                    "Manager will show your initials instead of an icon. A local icon.png (128x128 "
                    "or 256x256, repo root) is preferred since it renders offline once installed; "
                    "iconURL is the fallback and the only option shown before install"))
@@ -252,7 +252,7 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
        not (os.path.isfile(os.path.join(root, "scripts/fpp_uninstall.sh")) or
             os.path.isfile(os.path.join(root, "fpp_uninstall.sh"))):
         out.append(Finding(BLOCKER, "no-uninstall",
-                   "creates a systemd service but ships no fpp_uninstall.sh to remove it — add "
+                   "creates a systemd service but ships no fpp_uninstall.sh to remove it - add "
                    "one that mirrors the install, e.g. `systemctl disable --now <unit> && rm -f "
                    "/etc/systemd/system/<unit>`, so removing the plugin doesn't leave an orphaned "
                    "service behind"))

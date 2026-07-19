@@ -8,7 +8,7 @@ indent) and a full re-dump would rewrite every line.
 
 Reads ISSUE_BODY from the environment to find the "Plugin repoName" form field.
 Writes the removed entry's name to $GITHUB_OUTPUT (key `removed`) on success,
-or `error` with a message on failure. Exits 0 either way — the caller decides
+or `error` with a message on failure. Exits 0 either way - the caller decides
 whether to commit.
 """
 

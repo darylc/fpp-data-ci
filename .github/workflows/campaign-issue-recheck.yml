@@ -1,18 +1,18 @@
 # On-demand recheck for a single campaign tracking issue, instead of only via the
 # bulk manual campaign run (plugin-compliance-scan.yml) or the daily reconcile sweep
 # (daily-fpp-compat.yml). Mirrors scan-new-submission.yml's pattern:
-#   /recheck — re-run this one plugin's scan fresh (e.g. after pushing a fix).
-#   /submit  — the owner disagrees with a finding; flag needs-manual-review for a
+#   /recheck - re-run this one plugin's scan fresh (e.g. after pushing a fix).
+#   /submit  - the owner disagrees with a finding; flag needs-manual-review for a
 #              maintainer to decide regardless of the automated verdict.
 #
 # AUTHZ: unlike a submission/removal issue (opened by the person who then acts on
-# it), a tracking issue is opened by the campaign itself — there's no "issue
+# it), a tracking issue is opened by the campaign itself - there's no "issue
 # creator" to restrict /recheck and /submit to. This resolves the PLUGIN'S
 # REGISTERED OWNER instead (from srcURL, via resolve_plugin_owner.py) and only
 # lets that GitHub login use either command here.
 #
 # Identifies a tracking issue by the hidden `<!-- plugin:<name> campaign:fpp<n> -->`
-# marker campaign_scan.issue_body() puts in its body — same body-shape approach used
+# marker campaign_scan.issue_body() puts in its body - same body-shape approach used
 # throughout this repo's CI (see check-submission-token.yml) rather than a label,
 # since GitHub silently drops template labels that don't exist on the repo.
 
@@ -29,11 +29,11 @@ jobs:
   recheck:
     # contains() below is a coarse pre-filter (also matches a comment merely mentioning
     # "/recheck"/"/submit" as a substring, e.g. "/recheck_dont_actually_check" or a URL)
-    # — the extract step's word-boundary regex is the real, precise command parse. See
+    # - the extract step's word-boundary regex is the real, precise command parse. See
     # scan-new-submission.yml / remove-plugin-verify.yml, which had the exact same bug.
     #
     # `state == 'open'` blocks /recheck and /submit once the tracking issue is closed
-    # (certified compatible) — nothing left to recheck once that's happened.
+    # (certified compatible) - nothing left to recheck once that's happened.
     if: >-
       github.event.issue.state == 'open' &&
       contains(github.event.issue.body, '<!-- plugin:') &&
@@ -58,7 +58,7 @@ jobs:
             core.setOutput('name', m ? m[1] : '');
             core.setOutput('target', m ? m[2] : '');
 
-            // Word-boundary match, not substring — the job-level `if:` above is only a
+            // Word-boundary match, not substring - the job-level `if:` above is only a
             // coarse pre-filter that also matches e.g. "/recheck_dont_actually_check".
             const commentBody = context.payload.comment.body;
             const isSubmit = /(?:^|\s)\/submit(?:\s|$)/.test(commentBody);
@@ -133,7 +133,7 @@ jobs:
 
             if (!data.found) {
               await github.rest.issues.createComment({ owner, repo, issue_number,
-                body: `⚠️ \`${{ steps.extract.outputs.name }}\` is no longer in \`pluginList.json\` — nothing to recheck.` });
+                body: `⚠️ \`${{ steps.extract.outputs.name }}\` is no longer in \`pluginList.json\` - nothing to recheck.` });
               return;
             }
             const r = data.result;
@@ -154,15 +154,15 @@ jobs:
             const summary = `B${r.num_blocker} best-practice ${r.num_best_practice} optional ${r.num_optional}`;
             if (r.certified) {
               await github.rest.issues.createComment({ owner, repo, issue_number,
-                body: `✅ Rechecked — now declares FPP ${target} compatibility. Closing.` });
+                body: `✅ Rechecked - now declares FPP ${target} compatibility. Closing.` });
               await github.rest.issues.update({ owner, repo, issue_number, state: 'closed', state_reason: 'completed' });
             } else if (command === 'submit') {
               await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['needs-manual-review'] });
               await github.rest.issues.createComment({ owner, repo, issue_number,
-                body: `Rechecked (${summary}) — still not FPP ${target} compatible, but the owner used ` +
+                body: `Rechecked (${summary}) - still not FPP ${target} compatible, but the owner used ` +
                       `\`/submit\` to ask a maintainer to look regardless. Flagged for manual review.` });
             } else {
               await github.rest.issues.createComment({ owner, repo, issue_number,
-                body: `Rechecked (${summary}) — see the updated report above. Comment \`/recheck\` again ` +
+                body: `Rechecked (${summary}) - see the updated report above. Comment \`/recheck\` again ` +
                       `after another push, or \`/submit\` if you believe a finding doesn't apply.` });
             }

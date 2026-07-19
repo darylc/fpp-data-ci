@@ -1,4 +1,4 @@
-# GitHub Issue Form — "Submit a plugin".
+# GitHub Issue Form - "Submit a plugin".
 #
 # WHAT THIS IS: a structured intake form. When someone clicks "New issue" in the
 # fpp-data repo, GitHub renders these fields instead of a blank text box. The result
@@ -8,23 +8,23 @@
 # WHERE IT LIVES: FalconChristmas/fpp-data/.github/ISSUE_TEMPLATE/plugin-submission.yml
 # DOCS: https://docs.github.com/issues/tracking-your-work-with-issues/using-templates/syntax-for-githubs-form-schema
 #
-# NOTE ON THE CATEGORY DROPDOWN: Issue Forms are static — they can't read
+# NOTE ON THE CATEGORY DROPDOWN: Issue Forms are static - they can't read
 # pluginCategories.json at render time. The 10 options below are a hand-kept COPY of
 # the short names in pluginCategories.json (which stays the single source of truth).
 # A CI check (validate-pluginlist) asserts these two lists still match so they can't drift.
 
 name: "Plugin submission form, access via https://darylc.github.io/fpp-data-ci/submit_new_plugin/"
-description: Do not open this directly — use the guided submission page instead (link at the bottom of the New Issue chooser).
+description: Do not open this directly - use the guided submission page instead (link at the bottom of the New Issue chooser).
 title: "[New Plugin Submission - do not edit this title]"
 labels: ["plugin", "submission"]
 body:
   # No "GitHub repo" field: a prior version of this form had one, purely so a
   # maintainer skimming the issue would see a clickable repo link immediately. But an
   # editable field a submitter can freely change and that scan_submission.py never
-  # reads is misleading — it invites editing that has zero effect (nothing here can be
+  # reads is misleading - it invites editing that has zero effect (nothing here can be
   # "fixed" or "corrected" by typing into it). The repo link is instead surfaced in the
   # bot's own scan-result comment (a Field:/Data block, posted within a minute or two),
-  # which IS derived authoritatively from pluginInfo.json — same reasoning as
+  # which IS derived authoritatively from pluginInfo.json - same reasoning as
   # repoName/description below, just realized one field later.
   - type: input
     id: plugininfo_url
@@ -42,7 +42,7 @@ body:
     attributes:
       label: Category
       description: >
-        Which category best fits your plugin? (Copied from pluginCategories.json — the
+        Which category best fits your plugin? (Copied from pluginCategories.json - the
         canonical list. If none fit well, pick the closest and mention it below.)
       options:
         - Audio, Music & FM/RDS
@@ -61,21 +61,21 @@ body:
 
   # No "One-line description" field: like repoName/GitHub repo above, it's fully
   # derivable from pluginInfo.json's own `description`, and scan_submission.py never
-  # reads it from the issue body anyway — a submitter-typed copy here could never be
+  # reads it from the issue body anyway - a submitter-typed copy here could never be
   # anything but cosmetic, and would silently drift from the real value the moment
   # pluginInfo.json changes.
 
   # No "GitHub handle" field: whoever opens this issue is logged into GitHub to do it,
-  # so GitHub already records them as the reporter and auto-subscribes them to replies —
+  # so GitHub already records them as the reporter and auto-subscribes them to replies -
   # no @-mention needed for a maintainer to reach them.
 
-  # CONTACT TOKEN — the ONLY way an email reaches FPP. Never ask for a plain address
+  # CONTACT TOKEN - the ONLY way an email reaches FPP. Never ask for a plain address
   # here: this issue is PUBLIC the instant it's submitted (notifications, API, edit
   # history), so a plaintext address would leak immediately and redaction is too late.
   # The token is encrypted in the submitter's browser; only FPP's private contacts repo
   # holds the key. See docs/submit_new_plugin/index.html.
   #
-  # SANDBOX URL BELOW — swap to https://falconchristmas.github.io/fpp-data/contact/
+  # SANDBOX URL BELOW - swap to https://falconchristmas.github.io/fpp-data/contact/
   # when promoting upstream.
   - type: textarea
     id: contact_token
@@ -83,14 +83,14 @@ body:
       label: Contact token
       description: >
         Filled in by the
-        **[guided page](https://darylc.github.io/fpp-data-ci/submit_new_plugin/)** — leave it alone.
+        **[guided page](https://darylc.github.io/fpp-data-ci/submit_new_plugin/)** - leave it alone.
 
 
         ⚠️ **Never type your email address here.** This issue is public the instant you submit
         it, so a plain address would be exposed immediately and cannot be un-published. The
-        token is your email encrypted in your browser — only FPP maintainers can read it.
+        token is your email encrypted in your browser - only FPP maintainers can read it.
       placeholder: |
-        Empty? You arrived here directly. See the link above — go to the guided page first.
+        Empty? You arrived here directly. See the link above - go to the guided page first.
       render: text
     validations:
       required: true
@@ -100,7 +100,7 @@ body:
     attributes:
       label: Acknowledgements
       description: >
-        These mirror the Contribution Guidelines. All are required — please confirm each.
+        These mirror the Contribution Guidelines. All are required - please confirm each.
       options:
         - label: This plugin is production release quality and I have tested it on both the latest released version of FPP **and** the current nightly build.
           required: true

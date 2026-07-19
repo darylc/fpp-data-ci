@@ -1,16 +1,16 @@
 """Compliance scan for a brand-new plugin submission issue.
 
 Reuses the same checks as the retroactive fpp<major> campaign (lint_plugin.py, the
-pluginInfo.json schema check, and the repo-metadata checks — all shared via
+pluginInfo.json schema check, and the repo-metadata checks - all shared via
 lib_plugin_schema.py so the two scanners can't quietly drift apart), but gates HARDER:
 a plugin that's already listed keeps working if it picks up a BEST_PRACTICE finding
-after the fact — campaign findings are advisory, they never block a listing or trigger
+after the fact - campaign findings are advisory, they never block a listing or trigger
 its removal on their own. A plugin asking to be listed for the FIRST time has no such
 grandfathering: here, BEST_PRACTICE findings block same as BLOCKER, not just advisory.
 OPTIONAL stays advisory in both cases (LICENSE/README/icon/bugURL are nice-to-have,
 not a gate).
 
-repoName and the github.com repo are never taken from the submitter — both are derived
+repoName and the github.com repo are never taken from the submitter - both are derived
 here from pluginInfo.json itself (repoName is a field in the JSON; the repo comes from
 its srcURL, falling back to the raw.githubusercontent.com pluginInfo-url). There is
 nothing left for a submitter-supplied copy to mismatch against, so unlike the campaign
@@ -51,12 +51,12 @@ def find_duplicate_submission_issues(gh: tuple[str, str] | None, current_issue, 
     Compared by (owner, repo) rather than raw URL text: two submissions for the same
     plugin can legitimately point at different branches/paths, but the repo itself is
     the actual identity. Read cheaply from each candidate's OWN "pluginInfo.json raw
-    URL" field (required on every submission, old template or new) — no need to
+    URL" field (required on every submission, old template or new) - no need to
     re-fetch every open issue's pluginInfo.json just to compare identity.
 
     No "GitHub repo" field fallback here: that field was purely informational and has
     been removed from plugin-submission.yml (see its comments) since it was editable
-    but never actually read — pluginInfo.json raw URL was always the required field,
+    but never actually read - pluginInfo.json raw URL was always the required field,
     so every open issue, regardless of which template version created it, has one.
     """
     if not gh:
@@ -75,7 +75,7 @@ def find_duplicate_submission_issues(gh: tuple[str, str] | None, current_issue, 
 
 def already_listed(repo_name: str, plugin_list_path: str) -> bool:
     """Case-insensitive: repoName casing in a resubmission doesn't always match what's
-    already stored (same reasoning as verify_remove_plugin.py's resolve_owner) — an
+    already stored (same reasoning as verify_remove_plugin.py's resolve_owner) - an
     exact match would let a re-cased resubmission slip past as "new" and, later, past
     add_plugin_entry.py's own (exact-match) already_listed() too, inserting a second,
     case-variant entry for the same plugin."""
@@ -133,7 +133,7 @@ def main():
     gh = gh or parse_raw_github_repo(args.plugininfo_url)
 
     # repoName always comes from pluginInfo.json itself, falling back to the github.com
-    # repo slug (from srcURL/plugininfo-url) only if the JSON omits it — schema
+    # repo slug (from srcURL/plugininfo-url) only if the JSON omits it - schema
     # validation above already blocks a submission with no repoName at all, so this
     # fallback just keeps clone/lint working in that already-failing case too.
     repo_name = (info or {}).get("repoName") or (gh[1] if gh else None)
@@ -142,12 +142,12 @@ def main():
     # Previously this was only caught much later, in add_plugin_entry.py, AFTER a full
     # ownership check + clone + lint had already run for a submission that was always
     # going to be rejected as a duplicate. None of that is useful once we already know
-    # the answer is "nothing to do here" — repo-metadata findings, the owner-vs-
+    # the answer is "nothing to do here" - repo-metadata findings, the owner-vs-
     # submitter check, and clone+lint are all skipped, so the result is ONLY the
     # already-listed finding, not a pile of irrelevant blockers.
     already = bool(repo_name and already_listed(repo_name, args.plugin_list))
 
-    # Other OPEN submission issue(s) for the same repo — independent of `already`
+    # Other OPEN submission issue(s) for the same repo - independent of `already`
     # above, and always worth checking regardless of it (a listed plugin's repo could
     # still have a separate, unrelated pending re-submission open).
     duplicate_issues: list[int] = []
@@ -158,7 +158,7 @@ def main():
     linted = False
     if already:
         findings.append((BLOCKER, "already-listed",
-                          f"`{repo_name}` is already in pluginList.json — nothing to do here."))
+                          f"`{repo_name}` is already in pluginList.json - nothing to do here."))
     else:
         # --- repo metadata (archived / issues-disabled / bugURL) ----------------
         if gh:
@@ -169,7 +169,7 @@ def main():
 
         # --- ownership: submitter must own the repo, or prove write access -----
         # Unlike removal (verify_remove_plugin.py), a submission had NO ownership check
-        # at all until now — anyone could list anyone else's plugin. Mirrors removal's
+        # at all until now - anyone could list anyone else's plugin. Mirrors removal's
         # "delist": true proof-of-control trick: only someone with push access could add
         # a specific string to their OWN pluginInfo.json. The token is tied to this one
         # issue (not a permanent flag like "delist") so an old, already-approved
@@ -182,7 +182,7 @@ def main():
                 findings.append((BLOCKER, "owner-unconfirmed",
                     f"submitter @{args.reporter} does not match `{gh[0]}`, this repo's registered owner "
                     f"(from srcURL). Add `\"submissionToken\": \"{expected}\"` to your pluginInfo.json and "
-                    f"comment `/recheck` to prove you have write access here — or, if you're submitting on "
+                    f"comment `/recheck` to prove you have write access here - or, if you're submitting on "
                     f"the owner's behalf with their consent, comment `/submit` instead to flag this for a "
                     f"maintainer's judgement rather than auto-verifying."))
 
@@ -211,7 +211,7 @@ def main():
         "pass": not blocking,
         "already_listed": already,
         "linted": linted,
-        "owner": gh[0] if gh else None,   # registered owner from srcURL — may differ from the submitter
+        "owner": gh[0] if gh else None,   # registered owner from srcURL - may differ from the submitter
         "owner_confirmed": owner_confirmed,
         "repo_name": repo_name,
         "repo_url": f"https://github.com/{gh[0]}/{gh[1]}" if gh else None,
@@ -223,7 +223,7 @@ def main():
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=2)
 
-    print(f"{'PASS' if result['pass'] else 'FAIL'} — {len(blocking)} blocking, {len(advisory)} advisory")
+    print(f"{'PASS' if result['pass'] else 'FAIL'} - {len(blocking)} blocking, {len(advisory)} advisory")
     return 0
 
 

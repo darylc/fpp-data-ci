@@ -7,7 +7,7 @@
 #   * a per-plugin DRAFT tracking-issue body
 # uploaded as a build artifact you can review.
 #
-# TAGGING: draft bodies render the maintainer handle as PLAIN TEXT — no @-mention,
+# TAGGING: draft bodies render the maintainer handle as PLAIN TEXT - no @-mention,
 # nobody is notified. Creating the real tracking issues is OPT-IN via the
 # create_issues input (still no @-mention), and defaults to OFF for safe testing.
 

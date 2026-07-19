@@ -12,7 +12,7 @@ Modes:
 
 NEVER @-mentions an author. Bodies (from campaign_scan.issue_body) render the
 maintainer handle as plain text, so no one is notified. Same-repo issue writes
-use the default GITHUB_TOKEN — no PAT needed.
+use the default GITHUB_TOKEN - no PAT needed.
 
 Usage:
   sync_issues.py --summary out/summary.json --mode create|reconcile [--dry-run] [--limit N]
@@ -94,7 +94,7 @@ def main():
     created = updated = closed = noop = 0
     for r in plugins:
         name = r["name"]
-        title = f"[FPP {target}] {name} — compatibility & compliance"
+        title = f"[FPP {target}] {name} - compatibility & compliance"
         body = issue_body(r, target, draft=False)
         iss = existing.get(name)
 
@@ -106,7 +106,7 @@ def main():
                 else:
                     _req("POST", f"{API}/repos/{repo}/issues/{iss['number']}/comments", token,
                          {"body": f"✅ Detected a `versions[]` entry declaring FPP {target} "
-                                  f"support — thanks! Closing automatically."})
+                                  f"support - thanks! Closing automatically."})
                     _req("PATCH", f"{API}/repos/{repo}/issues/{iss['number']}", token,
                          {"state": "closed", "state_reason": "completed"})
                 closed += 1

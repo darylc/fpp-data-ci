@@ -3,7 +3,7 @@ srcURL.
 
 Used to authorize /recheck and /submit on a campaign tracking issue: unlike a
 submission or removal issue (opened by the person who then acts on it), a tracking
-issue is opened by the campaign itself — there's no "issue creator" to restrict
+issue is opened by the campaign itself - there's no "issue creator" to restrict
 those commands to. The plugin's actual registered owner is the right authority
 instead.
 

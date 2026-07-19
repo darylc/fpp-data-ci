@@ -17,15 +17,14 @@ from typing import Any, Optional
 import jsonschema
 
 USER_AGENT = "fpp-data-plugin-ci"
-HTTP_TIMEOUT = 15  # seconds — generous for CI, still bounded
+HTTP_TIMEOUT = 15  # seconds - generous for CI, still bounded
 
-# The rest of this campaign's CI NEVER @-mentions an author (see sync_issues.py,
-# campaign_scan.py) -- bulk scans pinging authors would be spam. The removal-report
-# flow (Request Plugin Removal, third-party path) is a deliberate, narrow exception:
-# notifying an owner that THEIR OWN plugin was reported as abandoned is closer to
-# "you should know about this" than a bulk scan is. Held off for now (plain text, no
-# real notification) until release; flip this one flag then -- every caller goes
-# through owner_ref() below.
+# This campaign's CI NEVER @-mentions an author (see sync_issues.py,
+# campaign_scan.py) -- bulk scans pinging authors would be spam. verify_remove_plugin.py's
+# unconfirmed-ownership escalation PR is a deliberate, narrow exception: naming the
+# registered owner there is closer to "you should know about this" than a bulk scan
+# is. Held off for now (plain text, no real notification) until release; flip this
+# one flag then -- every caller goes through owner_ref() below.
 MENTION_OWNER = False
 
 
@@ -47,7 +46,7 @@ def fetch_json(url: str) -> tuple[Optional[Any], Optional[str]]:
             raw = resp.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
         return None, f"HTTP {e.code} fetching {url}"
-    except Exception as e:  # noqa: BLE001 — surface any network/parse issue to the report
+    except Exception as e:  # noqa: BLE001 - surface any network/parse issue to the report
         return None, f"could not fetch {url}: {e}"
     try:
         return json.loads(raw), None
@@ -60,7 +59,7 @@ def resolve_repo_name(value: str) -> str:
     return just the repo name.
 
     Submitters of the Request Plugin Removal Issue Form often paste something other
-    than the bare name FPP actually stores in pluginList.json — a repo page
+    than the bare name FPP actually stores in pluginList.json - a repo page
     (`github.com/<owner>/<repo>`, with or without `.git`, `/issues`,
     `/blob/<branch>/pluginInfo.json`, ...), a raw file URL
     (`raw.githubusercontent.com/<owner>/<repo>/<branch>/pluginInfo.json`), or just
@@ -120,7 +119,7 @@ def parse_github_repo(url: str) -> Optional[tuple[str, str]]:
 def parse_raw_github_repo(url: str) -> Optional[tuple[str, str]]:
     """(owner, repo) from a raw.githubusercontent.com file URL, else None.
 
-    Complements parse_github_repo() above, which only handles github.com repo pages —
+    Complements parse_github_repo() above, which only handles github.com repo pages -
     a pluginInfo.json URL is a raw.githubusercontent.com file URL instead, and is
     sometimes the only URL a caller has (e.g. a submission with no srcURL yet).
     """
@@ -134,7 +133,7 @@ def schema_validation_error(info: dict, schema: dict) -> Optional[str]:
     Severity-free on purpose: validate_pluginlist.py (ERROR/WARNING, downgraded for
     pre-existing entries not touched by a PR) and the campaign/submission scanners
     (BLOCKER/BEST_PRACTICE/OPTIONAL) each wrap this in their own severity model rather
-    than sharing one — the two vocabularies don't map onto each other cleanly.
+    than sharing one - the two vocabularies don't map onto each other cleanly.
     """
     try:
         jsonschema.validate(info, schema)
@@ -147,7 +146,7 @@ def schema_validation_error(info: dict, schema: dict) -> Optional[str]:
 def repo_metadata_findings(meta: dict, bug_url: str) -> list[tuple[str, str, str]]:
     """archived / issues-disabled / bugURL findings from a GitHub API repo response.
 
-    Pure (no network) — the caller already has `meta` from gh_get_repo(). Returns
+    Pure (no network) - the caller already has `meta` from gh_get_repo(). Returns
     (severity, code, message) tuples using the same string severities as lint_plugin.py's
     BLOCKER/BEST_PRACTICE/OPTIONAL ("blocker"/"best-practice"/"optional"), so callers can
     append these directly alongside lint_plugin_dir()'s findings without translation.
@@ -162,7 +161,7 @@ def repo_metadata_findings(meta: dict, bug_url: str) -> list[tuple[str, str, str
     # always implies issues-disabled even if the flag wasn't flipped.
     if meta.get("has_issues") is False or meta.get("archived"):
         out.append(("blocker", "issues-disabled",
-                     "GitHub Issues are disabled — users can't report bugs and we can't reach you there"))
+                     "GitHub Issues are disabled - users can't report bugs and we can't reach you there"))
     elif not has_bug:
         out.append(("optional", "bugurl", "no bugURL set (Report-a-Bug link)"))
     return out
@@ -186,7 +185,7 @@ def gh_get_repo(owner: str, repo: str, token: Optional[str]) -> tuple[Optional[d
 
 def list_open_issues(gh_repo: str, label: str, token: Optional[str]) -> list[dict]:
     """Open issues on `gh_repo` (\"owner/repo\") carrying `label`. One page (100) is
-    plenty for this repo's issue volume — not worth paginating.
+    plenty for this repo's issue volume - not worth paginating.
 
     Used for same-plugin duplicate-open-request detection (removal and submission
     flows both label their issue kind, so filtering server-side keeps this cheap).
@@ -199,13 +198,13 @@ def list_open_issues(gh_repo: str, label: str, token: Optional[str]) -> list[dic
         req = urllib.request.Request(api, headers=headers)
         with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
             return json.loads(resp.read().decode("utf-8", "replace"))
-    except Exception:  # noqa: BLE001 — best-effort; a failure here just skips dupe detection
+    except Exception:  # noqa: BLE001 - best-effort; a failure here just skips dupe detection
         return []
 
 
 def field(body: str, label: str) -> str:
     """Value under a GitHub issue-form '### <label>' heading (first non-empty line).
-    Shared by every script that parses an issue-form body — the field/heading shape
+    Shared by every script that parses an issue-form body - the field/heading shape
     is a GitHub Issue Forms convention, not specific to any one flow."""
     lines = (body or "").splitlines()
     for i, line in enumerate(lines):

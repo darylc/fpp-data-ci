@@ -65,19 +65,19 @@
   <div class="info-block">
     <p class="info-block-title">What happens after I submit?</p>
     <ol style="padding-left:1.2rem">
-      <li>On the next page, tell us whether you're the plugin's author/maintainer and
-          why you're requesting removal, then submit the issue.</li>
-      <li><strong>If you're the author</strong>, ownership is checked automatically
-          (it compares your GitHub login against the plugin repo's owner). If it can't
-          confirm that directly (e.g. an org-owned repo), it'll ask you to add
-          <code>"delist": true</code> to your <code>pluginInfo.json</code> as proof -
-          only someone with write access could do that.</li>
-      <li><strong>If you're a third party</strong> reporting an abandoned plugin, it's
-          never removed automatically - the actual owner gets a chance to respond
-          first, and a maintainer reviews it if there's no resolution.</li>
+      <li>On the next page, tell us why you're requesting removal, then submit the issue.</li>
+      <li><strong>Ownership is checked automatically</strong> for everyone, regardless
+          of who's asking (it compares your GitHub login against the plugin repo's
+          owner). If it can't confirm that directly (e.g. an org-owned repo, or
+          you're reporting someone else's plugin), it'll ask for proof: add
+          <code>"delist": true</code> to the plugin's <code>pluginInfo.json</code> -
+          only someone with write access to that repo could do that.</li>
       <li>Once ownership is confirmed, the entry is removed from
           <code>pluginList.json</code> and the issue is closed automatically -
           no maintainer wait needed for a verified request.</li>
+      <li>Can't prove control yourself (e.g. reporting an abandoned plugin you don't
+          own)? Comment <code>/submit</code> on the issue to flag it for a maintainer
+          to decide by hand instead.</li>
     </ol>
   </div>
 

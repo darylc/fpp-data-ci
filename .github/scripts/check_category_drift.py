@@ -4,21 +4,21 @@
 WHY THIS EXISTS
 ---------------
 pluginCategories.json is the single source of truth, but
-.github/ISSUE_TEMPLATE/plugin-submission.yml can't read it at render time — GitHub
-Issue Forms are static YAML — so its dropdown is a hand-kept copy. Add a category
+.github/ISSUE_TEMPLATE/plugin-submission.yml can't read it at render time - GitHub
+Issue Forms are static YAML - so its dropdown is a hand-kept copy. Add a category
 upstream and the form silently offers a stale list forever, with no error anywhere.
 This check is what stops that. Exits non-zero on mismatch.
 
 The dropdown shows longName, not name: a static YAML dropdown has no separate
 label/value, so its options ARE what gets submitted, and GitHub Issue Forms cannot
-prefill a dropdown field via query parameters under any circumstances — so there's no
+prefill a dropdown field via query parameters under any circumstances - so there's no
 "submit shortName, display longName" trick available here like there is for other
 input fields. Whoever transcribes an accepted submission into pluginList.json maps
 longName back to shortName via pluginCategories.json.
 
 (The guided page at docs/submit_new_plugin/ used to keep a second hand copy for its
 own dropdown, but no longer touches categories at all, for the same prefill-limitation
-reason — the submitter picks Category on the real GitHub form instead.)
+reason - the submitter picks Category on the real GitHub form instead.)
 
 Usage:
   check_category_drift.py --categories pluginCategories.json \
@@ -32,7 +32,7 @@ import yaml
 
 
 def load_source_of_truth_long(path):
-    """Long names — what the Issue Form dropdown shows (short name isn't
+    """Long names - what the Issue Form dropdown shows (short name isn't
     representable in a static Issue Forms dropdown, see plugin-submission.yml)."""
     data = json.load(open(path))
     arr = data if isinstance(data, list) else (data.get("categories") or data.get("pluginCategories") or [])
@@ -47,7 +47,7 @@ def load_form_dropdown(path):
     for block in doc.get("body", []):
         if block.get("id") == "category" and block.get("type") == "dropdown":
             return list(block["attributes"]["options"])
-    sys.exit(f"FATAL: no 'category' dropdown found in {path} — did the field id change?")
+    sys.exit(f"FATAL: no 'category' dropdown found in {path} - did the field id change?")
 
 
 def report(label, truth, actual, errors):
@@ -79,7 +79,7 @@ def main():
     report("Issue Form dropdown", truth_long, load_form_dropdown(args.form), errors)
 
     if errors:
-        print("\nCategory lists have drifted. pluginCategories.json is the source of truth —")
+        print("\nCategory lists have drifted. pluginCategories.json is the source of truth -")
         print("update the copy to match it (or add the category there first).")
         return 1
     print("\nAll category copies match pluginCategories.json.")

@@ -46,10 +46,16 @@ def _req(method, url, token, body=None):
 
 
 def list_campaign_issues(repo, token, label):
-    """All issues (any state) carrying the campaign label, matched later by marker."""
+    """OPEN issues carrying the campaign label, matched later by marker.
+
+    Closed issues are intentionally excluded: if a plugin's old tracking issue
+    was closed (e.g. reconcile mode auto-closing it once compatible), the next
+    campaign run should open a fresh, visible issue rather than silently
+    resurrecting/updating the closed one in place, where nobody would see it.
+    """
     out, page = [], 1
     while True:
-        url = f"{API}/repos/{repo}/issues?state=all&labels={label}&per_page=100&page={page}"
+        url = f"{API}/repos/{repo}/issues?state=open&labels={label}&per_page=100&page={page}"
         batch = _req("GET", url, token)
         if not batch:
             break

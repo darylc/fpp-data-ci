@@ -19,6 +19,7 @@ Standalone:  python lint_plugin.py <plugin_dir> [repoName]
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import sys
@@ -920,8 +921,9 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
     # §7 only ASKS heavy plugins to declare these, it doesn't require it, and
     # "looks compute-heavy" is a two-sided guess (native code + no hints), not
     # a proven defect - a documentation-adherence nudge, not a bug report.
-    has_hint = any(v.get("minMemoryMB") or v.get("minCpuCores")
-                   for v in (info or {}).get("versions", []) if isinstance(v, dict))
+    # minMemoryMB/minCpuCores are top-level pluginInfo.json fields (describe the
+    # plugin as a whole, no per-version override) - NOT nested in versions[].
+    has_hint = bool((info or {}).get("minMemoryMB") or (info or {}).get("minCpuCores"))
     looks_heavy = (not has_hint) and (
         any(n.lower() in ("makefile", "cmakelists.txt") for n in lower)
         or first(r'\b(ffmpeg|opencv|libcamera|videocapture)\b', exts=(".cpp", ".c", ".h", ".hpp", ".py")))
@@ -929,8 +931,8 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
         out.append(Finding(OPTIONAL, "no-resource-hints",
                    "looks potentially compute/memory heavy (native build / video-capture-shaped code) but declares no "
                    "minMemoryMB/minCpuCores in pluginInfo.json - if this plugin genuinely needs more "
-                   "than a Pi Zero's resources to run acceptably, declare it on the versions[] entry "
-                   "(see PLUGININFO_FORMAT.md's Resource hints section) so FPP can warn/hide it on "
+                   "than a Pi Zero's resources to run acceptably, declare it as a top-level field in "
+                   "pluginInfo.json (see PLUGININFO_FORMAT.md's Resource hints section) so FPP can warn/hide it on "
                    "underpowered devices instead of the user finding out the hard way"))
 
     # Still implementing the deprecated registerApis(httpserver::webserver*)
@@ -955,7 +957,19 @@ def main(argv):
     if len(argv) < 2:
         print("usage: lint_plugin.py <plugin_dir> [repoName]", file=sys.stderr)
         return 2
-    findings = lint_plugin_dir(argv[1], argv[2] if len(argv) > 2 else None)
+    # Load pluginInfo.json ourselves so checks that key off it (no-icon,
+    # no-resource-hints) see real data under direct CLI use too, matching
+    # new_major_release_scan.py/scan_submission.py, which already load and
+    # pass it.
+    info = None
+    info_path = os.path.join(argv[1], "pluginInfo.json")
+    if os.path.isfile(info_path):
+        try:
+            with open(info_path, encoding="utf-8") as f:
+                info = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            info = None
+    findings = lint_plugin_dir(argv[1], argv[2] if len(argv) > 2 else None, info)
     for f in findings:
         print(f"{f.severity.upper():5} [{f.code}] {f.message}")
     print(f"\n{len(findings)} finding(s)")

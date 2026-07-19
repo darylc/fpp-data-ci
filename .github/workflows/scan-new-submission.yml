@@ -3,7 +3,7 @@
 # WHY: check-submission-token.yml only guards the contact token; nothing else was
 # checked automatically on a new "Submit a plugin" issue before a human reviewed it
 # by hand. This reuses the same linter (lint_plugin.py) and pluginInfo.json schema
-# the fpp<major> compliance campaign already runs against LISTED plugins, but gates
+# the fpp<major> compliance new-major-release scan already runs against LISTED plugins, but gates
 # harder - see scan_submission.py's docstring: a brand-new submission has no
 # grandfathering, so BEST_PRACTICE findings block here too, not just BLOCKER.
 #
@@ -205,7 +205,7 @@ jobs:
             const order = { blocker: 0, 'best-practice': 1, optional: 2 };
             const findings = [...result.findings].sort((a, b) => (order[a.severity] ?? 3) - (order[b.severity] ?? 3));
 
-            // Mention the reporter directly: unlike the bulk fpp<major> campaign scan
+            // Mention the reporter directly: unlike the bulk fpp<major> new-major-release scan
             // (MENTION_OWNER = False in lib_plugin_schema.py - pinging every listed
             // plugin's author unprompted would be spam), this is a direct reply to an
             // issue the person just opened themselves asking for exactly this feedback.
@@ -225,7 +225,7 @@ jobs:
             // Owner is named but NOT @-mentioned (no leading @, plain text only) - unlike
             // the reporter below, they didn't ask for this notification by opening the issue,
             // so pinging them unprompted would be the same spam problem MENTION_OWNER=False
-            // avoids for the campaign scanner in lib_plugin_schema.py.
+            // avoids for the new-major-release scanner in lib_plugin_schema.py.
             const category = process.env.CATEGORY || '';
             const fields = [];
             if (result.repo_name) fields.push(`**Plugin:** ${result.repo_name}`);
@@ -425,7 +425,7 @@ jobs:
 
             // Hidden marker recheck-listing-pr.yml parses to know which plugin/issue
             // this PR is for, without re-deriving either from the visible prose below
-            // (same pattern as campaign-issue-recheck.yml's `<!-- plugin:... -->`).
+            // (same pattern as new-major-release-issue-recheck.yml's `<!-- plugin:... -->`).
             const lines = [`<!-- listing-pr repo:${repoName} issue:${issue_number} -->`,
                             `Adds \`${repoName}\` to \`pluginList.json\`, requested in #${issue_number}.`, ''];
             if (repoUrl) lines.push(`**Plugin repo:** ${repoUrl}`);

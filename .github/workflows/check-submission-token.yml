@@ -57,8 +57,8 @@ jobs:
             const malformed = !missing && !isEmail && !val.startsWith('FPPC1:');
 
             // Mention the reporter directly - see scan-new-submission.yml for why this
-            // differs from the campaign scanner's no-mention policy: this is a direct
-            // reply to an issue the person just opened themselves.
+            // differs from the new-major-release scanner's no-mention policy: this is a
+            // direct reply to an issue the person just opened themselves.
             const reporter = context.payload.issue.user.login;
 
             let msg = null;

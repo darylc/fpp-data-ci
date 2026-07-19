@@ -1,4 +1,4 @@
-# Major-release plugin compliance & certification campaign (manual).
+# Major-release plugin compliance & certification scan (manual).
 #
 # WHAT THIS IS: run in the lead-up to an FPP major release. It clones every plugin
 # in pluginList.json, runs the compliance linter + FPP-<major> compatibility check,
@@ -57,7 +57,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # lifts API rate limit to 5000/hr
         run: |
-          python .github/scripts/campaign_scan.py \
+          python .github/scripts/new_major_release_scan.py \
             --target-major "${{ inputs.target_major }}" \
             --plugin-list pluginList.json \
             --plugins-dir plugins \
@@ -79,5 +79,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python .github/scripts/sync_issues.py \
+          python .github/scripts/new_major_release_sync_issues.py \
             --summary out/summary.json --mode create --limit "${{ inputs.limit }}"

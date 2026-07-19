@@ -1,14 +1,14 @@
-"""Re-run the campaign scan for ONE plugin, on demand - a tracking issue's /recheck
-or /submit comment, rather than waiting for the next bulk campaign run
-(plugin-compliance-scan.yml) or the daily reconcile sweep (daily-fpp-compat.yml).
+"""Re-run the new-major-release scan for ONE plugin, on demand - a tracking issue's
+/recheck or /submit comment, rather than waiting for the next bulk scan
+(new-major-release-scan.yml) or the daily reconcile sweep (daily-fpp-compat.yml).
 
-Reuses campaign_scan.scan_plugin() exactly as the bulk campaign does (same findings,
-same status logic) so a single-plugin recheck can never disagree with what the next
-bulk run would have said. Clones the one repo fresh, same as scan_submission.py does
-for a brand-new submission.
+Reuses new_major_release_scan.scan_plugin() exactly as the bulk scan does (same
+findings, same status logic) so a single-plugin recheck can never disagree with what
+the next bulk run would have said. Clones the one repo fresh, same as
+scan_submission.py does for a brand-new submission.
 
 Usage:
-  campaign_recheck_one.py --plugin-list pluginList.json --repo-name <name> \
+  new_major_release_recheck_one.py --plugin-list pluginList.json --repo-name <name> \
       --target-major <n> --schema .github/schema/pluginInfo.schema.json --out result.json
 """
 
@@ -22,7 +22,7 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lib_plugin_schema import load_pluginlist, fetch_json, parse_github_repo  # noqa: E402
-from campaign_scan import scan_plugin, issue_body  # noqa: E402
+from new_major_release_scan import scan_plugin, issue_body  # noqa: E402
 from scan_submission import clone_repo  # noqa: E402
 
 

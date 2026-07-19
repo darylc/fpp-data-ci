@@ -1,20 +1,20 @@
 """Compliance scan for a brand-new plugin submission issue.
 
-Reuses the same checks as the retroactive fpp<major> campaign (lint_plugin.py, the
-pluginInfo.json schema check, and the repo-metadata checks - all shared via
-lib_plugin_schema.py so the two scanners can't quietly drift apart), but gates HARDER:
-a plugin that's already listed keeps working if it picks up a BEST_PRACTICE finding
-after the fact - campaign findings are advisory, they never block a listing or trigger
-its removal on their own. A plugin asking to be listed for the FIRST time has no such
-grandfathering: here, BEST_PRACTICE findings block same as BLOCKER, not just advisory.
-OPTIONAL stays advisory in both cases (LICENSE/README/icon/bugURL are nice-to-have,
-not a gate).
+Reuses the same checks as the retroactive fpp<major> new-major-release scan
+(lint_plugin.py, the pluginInfo.json schema check, and the repo-metadata checks - all
+shared via lib_plugin_schema.py so the two scanners can't quietly drift apart), but
+gates HARDER: a plugin that's already listed keeps working if it picks up a
+BEST_PRACTICE finding after the fact - new-major-release findings are advisory, they
+never block a listing or trigger its removal on their own. A plugin asking to be
+listed for the FIRST time has no such grandfathering: here, BEST_PRACTICE findings
+block same as BLOCKER, not just advisory. OPTIONAL stays advisory in both cases
+(LICENSE/README/icon/bugURL are nice-to-have, not a gate).
 
 repoName and the github.com repo are never taken from the submitter - both are derived
 here from pluginInfo.json itself (repoName is a field in the JSON; the repo comes from
 its srcURL, falling back to the raw.githubusercontent.com pluginInfo-url). There is
-nothing left for a submitter-supplied copy to mismatch against, so unlike the campaign
-scanner there is no repo-name-mismatch check here.
+nothing left for a submitter-supplied copy to mismatch against, so unlike the
+new-major-release scanner there is no repo-name-mismatch check here.
 
 Usage:
   scan_submission.py --plugininfo-url <raw pluginInfo.json URL> \
@@ -203,7 +203,7 @@ def main():
                               "could not determine a github.com repo from srcURL or the pluginInfo.json URL"))
 
     # --- verdict ---------------------------------------------------------------
-    # Stricter than the campaign: BEST_PRACTICE blocks a new submission, not just BLOCKER.
+    # Stricter than the new-major-release scan: BEST_PRACTICE blocks a new submission, not just BLOCKER.
     blocking = [f for f in findings if f[0] in (BLOCKER, BEST_PRACTICE)]
     advisory = [f for f in findings if f[0] == OPTIONAL]
 

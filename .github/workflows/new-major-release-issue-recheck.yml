@@ -1,22 +1,23 @@
-# On-demand recheck for a single campaign tracking issue, instead of only via the
-# bulk manual campaign run (00-new-major-version-scan.yml) or the daily reconcile sweep
+# On-demand recheck for a single new-major-release tracking issue, instead of only
+# via the bulk manual scan (new-major-release-scan.yml) or the daily reconcile sweep
 # (daily-fpp-compat.yml). Mirrors scan-new-submission.yml's pattern:
 #   /recheck - re-run this one plugin's scan fresh (e.g. after pushing a fix).
 #   /submit  - the owner disagrees with a finding; flag needs-manual-review for a
 #              maintainer to decide regardless of the automated verdict.
 #
 # AUTHZ: unlike a submission/removal issue (opened by the person who then acts on
-# it), a tracking issue is opened by the campaign itself - there's no "issue
-# creator" to restrict /recheck and /submit to. This resolves the PLUGIN'S
+# it), a tracking issue is opened by the new-major-release scan itself - there's no
+# "issue creator" to restrict /recheck and /submit to. This resolves the PLUGIN'S
 # REGISTERED OWNER instead (from srcURL, via resolve_plugin_owner.py) and only
 # lets that GitHub login use either command here.
 #
-# Identifies a tracking issue by the hidden `<!-- plugin:<name> campaign:fpp<n> -->`
-# marker campaign_scan.issue_body() puts in its body - same body-shape approach used
-# throughout this repo's CI (see check-submission-token.yml) rather than a label,
-# since GitHub silently drops template labels that don't exist on the repo.
+# Identifies a tracking issue by the hidden
+# `<!-- plugin:<name> new_major_release:fpp<n> -->` marker
+# new_major_release_scan.issue_body() puts in its body - same body-shape approach
+# used throughout this repo's CI (see check-submission-token.yml) rather than a
+# label, since GitHub silently drops template labels that don't exist on the repo.
 
-name: ZZ - Automation - Recheck campaign tracking issue
+name: ZZ - Automation - Recheck new major release tracking issue
 
 on:
   issue_comment:
@@ -54,7 +55,7 @@ jobs:
         with:
           script: |
             const body = context.payload.issue.body || '';
-            const m = body.match(/<!--\s*plugin:(\S+)\s+campaign:fpp(\d+)\s*-->/);
+            const m = body.match(/<!--\s*plugin:(\S+)\s+new_major_release:fpp(\d+)\s*-->/);
             core.setOutput('name', m ? m[1] : '');
             core.setOutput('target', m ? m[2] : '');
 
@@ -130,7 +131,7 @@ jobs:
           REPO_NAME: ${{ steps.extract.outputs.name }}
           TARGET_MAJOR: ${{ steps.extract.outputs.target }}
         run: |
-          python .github/scripts/campaign_recheck_one.py \
+          python .github/scripts/new_major_release_recheck_one.py \
             --plugin-list pluginList.json \
             --repo-name "$REPO_NAME" \
             --target-major "$TARGET_MAJOR" \
@@ -168,7 +169,7 @@ jobs:
             // issue itself always reflects the latest recheck, not just the comment.
             await github.rest.issues.update({ owner, repo, issue_number, body: data.body });
 
-            // Swap the status:<...> label (added by sync_issues.py at creation time).
+            // Swap the status:<...> label (added by new_major_release_sync_issues.py at creation time).
             const issue = await github.rest.issues.get({ owner, repo, issue_number });
             for (const l of issue.data.labels) {
               if (typeof l === 'object' && l.name && l.name.startsWith('status:') && l.name !== `status:${r.status}`) {

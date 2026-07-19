@@ -19,8 +19,8 @@ import jsonschema
 USER_AGENT = "fpp-data-plugin-ci"
 HTTP_TIMEOUT = 15  # seconds - generous for CI, still bounded
 
-# This campaign's CI NEVER @-mentions an author (see sync_issues.py,
-# campaign_scan.py) -- bulk scans pinging authors would be spam. verify_remove_plugin.py's
+# This CI NEVER @-mentions an author (see new_major_release_sync_issues.py,
+# new_major_release_scan.py) -- bulk scans pinging authors would be spam. verify_remove_plugin.py's
 # unconfirmed-ownership escalation PR is a deliberate, narrow exception: naming the
 # registered owner there is closer to "you should know about this" than a bulk scan
 # is. Held off for now (plain text, no real notification) until release; flip this
@@ -131,9 +131,10 @@ def schema_validation_error(info: dict, schema: dict) -> Optional[str]:
     """Validate pluginInfo.json against the schema. Returns a message, or None if valid.
 
     Severity-free on purpose: validate_pluginlist.py (ERROR/WARNING, downgraded for
-    pre-existing entries not touched by a PR) and the campaign/submission scanners
-    (BLOCKER/BEST_PRACTICE/OPTIONAL) each wrap this in their own severity model rather
-    than sharing one - the two vocabularies don't map onto each other cleanly.
+    pre-existing entries not touched by a PR) and the new-major-release/submission
+    scanners (BLOCKER/BEST_PRACTICE/OPTIONAL) each wrap this in their own severity
+    model rather than sharing one - the two vocabularies don't map onto each other
+    cleanly.
     """
     try:
         jsonschema.validate(info, schema)
@@ -187,7 +188,7 @@ def gh_get_contributors(owner: str, repo: str, token: Optional[str], limit: int 
     """Top `limit` contributor logins (by commit count, the API's default order)
     for owner/repo. Public endpoint, no special access needed.
 
-    Used when a plugin's repo is org-owned (see campaign_scan.py): the org login
+    Used when a plugin's repo is org-owned (see new_major_release_scan.py): the org login
     itself isn't a person who can be @-mentioned or notified, so the individual
     contributors most likely to actually see a tracking issue are surfaced
     instead. Best-effort - returns [] on any failure (private/empty repo, rate

@@ -1,11 +1,11 @@
 """Print the registered owner (GitHub login) of a pluginList.json entry, from its
 srcURL.
 
-Used to authorize /recheck and /submit on a campaign tracking issue: unlike a
-submission or removal issue (opened by the person who then acts on it), a tracking
-issue is opened by the campaign itself - there's no "issue creator" to restrict
-those commands to. The plugin's actual registered owner is the right authority
-instead.
+Used to authorize /recheck and /submit on a new-major-release tracking issue: unlike
+a submission or removal issue (opened by the person who then acts on it), a tracking
+issue is opened by the new-major-release scan itself - there's no "issue creator" to
+restrict those commands to. The plugin's actual registered owner is the right
+authority instead.
 
 Usage: resolve_plugin_owner.py --plugin-list pluginList.json --repo-name <name>
 Writes `owner` (empty if unresolvable) to $GITHUB_OUTPUT.

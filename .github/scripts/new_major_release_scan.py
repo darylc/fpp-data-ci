@@ -1,4 +1,4 @@
-"""Major-release plugin compliance & certification scanner (campaign backbone).
+"""Major-release plugin compliance & certification scanner (new-major-release backbone).
 
 For a target FPP major, walks every entry in pluginList.json and, per plugin:
   * evaluates whether any versions[] entry declares compatibility with the major
@@ -16,7 +16,7 @@ Maintainer handles are written as plain text (no leading @), so even if a body
 were posted by hand nobody is pinged. Real notification is a later, gated step.
 
 Usage:
-  campaign_scan.py --target-major 10 --plugin-list pluginList.json \
+  new_major_release_scan.py --target-major 10 --plugin-list pluginList.json \
       --plugins-dir <dir-of-clones> --out out/
 """
 
@@ -148,7 +148,7 @@ def scan_plugin(entry, target, plugins_dir, token, schema):
         findings.append((OPTIONAL, "removal-requested",
                          "author set \"delist\": true in pluginInfo.json - plugin removal requested"))
 
-    # --- version compatibility (the primary campaign signal) ----------------
+    # --- version compatibility (the primary new-major-release signal) -------
     versions = info.get("versions") or []
     certified = compatible_with_major(versions, target)
     last_major = highest_supported_major(versions)
@@ -226,7 +226,7 @@ ICON = {"compatible": "✅", "needs-update": "🔧", "unmaintained": "💤",
 
 def issue_body(r, target, draft=True):
     L = []
-    L.append(f"<!-- plugin:{r['name']} campaign:fpp{target} -->")
+    L.append(f"<!-- plugin:{r['name']} new_major_release:fpp{target} -->")
     if draft:
         L.append(f"> **DRY RUN - draft only. The maintainer has NOT been notified.**")
         L.append("")

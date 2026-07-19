@@ -78,8 +78,9 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
     """Run all static checks against a plugin working tree; return findings.
 
     `info` is the plugin's already-parsed pluginInfo.json, if the caller has it (both
-    campaign_scan.py and scan_submission.py load it anyway) - used for checks that need
-    to cross-reference the manifest against the working tree, like the icon check.
+    new_major_release_scan.py and scan_submission.py load it anyway) - used for checks
+    that need to cross-reference the manifest against the working tree, like the icon
+    check.
     """
     out: list[Finding] = []
     repo = repo_name or os.path.basename(os.path.normpath(root))

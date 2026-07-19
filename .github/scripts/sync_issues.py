@@ -105,14 +105,17 @@ def main():
         iss = existing.get(name)
 
         if args.mode == "reconcile":
-            # Only act when the plugin is now compatible and an issue is open.
-            if r["certified"] and iss and iss.get("state") == "open":
+            # Only act when the plugin is now compatible with no outstanding blockers
+            # and an issue is open. certified alone isn't enough - it only means a
+            # versions[] entry declares the target major, not that blocker findings
+            # (schema errors, lint failures, etc) have been resolved.
+            if r["ready_to_close"] and iss and iss.get("state") == "open":
                 if args.dry_run:
-                    print(f"[dry-run] CLOSE #{iss['number']} {name} (now FPP {target} compatible)")
+                    print(f"[dry-run] CLOSE #{iss['number']} {name} (now FPP {target} compatible, no blockers)")
                 else:
                     _req("POST", f"{API}/repos/{repo}/issues/{iss['number']}/comments", token,
                          {"body": f"✅ Detected a `versions[]` entry declaring FPP {target} "
-                                  f"support - thanks! Closing automatically."})
+                                  f"support with no outstanding blockers - thanks! Closing automatically."})
                     _req("PATCH", f"{API}/repos/{repo}/issues/{iss['number']}", token,
                          {"state": "closed", "state_reason": "completed"})
                 closed += 1

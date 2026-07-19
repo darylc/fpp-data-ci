@@ -31,7 +31,6 @@ import lib_plugin_schema as lib
 from lint_plugin import lint_plugin_dir, BLOCKER, BEST_PRACTICE, OPTIONAL
 
 GUIDELINES = "https://github.com/FalconChristmas/fpp-plugin-Template/blob/master/PLUGIN_GUIDELINES.md"
-FORMAT_DOC = "https://github.com/FalconChristmas/fpp-plugin-Template/blob/master/PLUGININFO_FORMAT.md"
 # SANDBOX URLs - swap to FalconChristmas/fpp-data (and its Pages equivalent) when
 # promoting upstream (same convention as the guided pages and Issue Form links
 # elsewhere in this repo).
@@ -163,18 +162,24 @@ def scan_plugin(entry, target, plugins_dir, token, schema):
     else:
         status = "needs-update"
 
+    num_blocker = sum(1 for s, _, _ in findings if s == BLOCKER)
     return {
         "name": name,
         "owner": owner,
         "status": status,
         "certified": certified,
+        # certified only means "declares a versions[] entry for the target major" -
+        # it says nothing about outstanding BLOCKER findings (schema errors, lint
+        # failures, etc). ready_to_close is the actual gate for auto-closing a
+        # tracking issue: declared compatible AND no unresolved blockers.
+        "ready_to_close": certified and num_blocker == 0,
         "removal_requested": removal_requested,
         "issues_enabled": meta.get("has_issues"),
         "archived": meta.get("archived"),
         "months_since_push": stale,
         "linted": linted,
         "findings": findings,
-        "num_blocker": sum(1 for s, _, _ in findings if s == BLOCKER),
+        "num_blocker": num_blocker,
         "num_best_practice": sum(1 for s, _, _ in findings if s == BEST_PRACTICE),
         "num_optional": sum(1 for s, _, _ in findings if s == OPTIONAL),
     }
@@ -206,6 +211,14 @@ def issue_body(r, target, draft=True):
                  f"[Request Plugin Removal]({REMOVAL_FORM}) issue and we'll remove it from the list, "
                  f"no update needed.")
         L.append("")
+    L.append(f"As part of this new process, in the lead up to each new version release we will create "
+             f"a GitHub issue like this one and ask that you review compatibility of your plugin with "
+             f"the new version and outline any new best practices for plugins. Please review this "
+             f"information and update your plugin accordingly.")
+    L.append("")
+    L.append(f"Once you have updated your plugin, please comment `/recheck` on this issue and we will "
+             f"automatically scan your plugin and comment the new results here.")
+    L.append("")
     # compatibility
     if r["certified"]:
         L.append(f"### ✅ Compatibility\nA `versions[]` entry already declares FPP {target} support.")
@@ -229,13 +242,7 @@ def issue_body(r, target, draft=True):
         for sev, code, msg in sorted(r["findings"], key=lambda f: order.get(f[0], 3)):
             L.append(f"- {badge.get(sev, '')} **{label.get(sev, sev)} - {code}** - {msg}")
         L.append("")
-    L.append(f"Please review the [Plugin Guidelines]({GUIDELINES}) and "
-             f"[pluginInfo.json format]({FORMAT_DOC}).")
-    L.append("")
-    L.append(f"**Removing this plugin instead?** Start at the [guided removal page]"
-             f"({REMOVAL_GUIDED_PAGE}) (fills in the repoName for you), or open a "
-             f"[Request Plugin Removal]({REMOVAL_FORM}) issue directly - we'll remove it from the "
-             f"list, no update needed.")
+    L.append(f"Want to sunset this plugin - submit removal request at {REMOVAL_GUIDED_PAGE}")
     if not draft:
         L.append("")
         L.append("**Comment `/recheck` after pushing a fix to re-run this check.**")

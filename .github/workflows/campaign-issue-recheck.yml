@@ -178,10 +178,14 @@ jobs:
             await github.rest.issues.addLabels({ owner, repo, issue_number, labels: [`status:${r.status}`] });
 
             const summary = `B${r.num_blocker} best-practice ${r.num_best_practice} optional ${r.num_optional}`;
-            if (r.certified) {
+            if (r.ready_to_close) {
               await github.rest.issues.createComment({ owner, repo, issue_number,
-                body: `✅ Rechecked - now declares FPP ${target} compatibility. Closing.` });
+                body: `✅ Rechecked - now declares FPP ${target} compatibility with no outstanding blockers. Closing.` });
               await github.rest.issues.update({ owner, repo, issue_number, state: 'closed', state_reason: 'completed' });
+            } else if (r.certified && r.num_blocker > 0) {
+              await github.rest.issues.createComment({ owner, repo, issue_number,
+                body: `Rechecked - declares FPP ${target} compatibility, but still has ${r.num_blocker} ` +
+                      `blocker finding(s) to resolve before this can close. See the updated report above.` });
             } else if (command === 'submit') {
               await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['needs-manual-review'] });
               await github.rest.issues.createComment({ owner, repo, issue_number,

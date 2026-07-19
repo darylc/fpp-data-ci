@@ -40,7 +40,12 @@ jobs:
     # are "issues" under the hood for this event). contains() below is a coarse
     # pre-filter, same caveat as the other workflows' job-level `if:` -- the real,
     # word-boundary command parse happens in the extract step.
+    #
+    # `state == 'open'` blocks /recheck once the PR is closed OR merged (a merged PR
+    # still has state 'closed' in this event's payload) -- nothing left to recheck
+    # against once the PR itself is done.
     if: >-
+      github.event.issue.state == 'open' &&
       github.event.issue.pull_request != null &&
       contains(github.event.issue.body, '<!-- listing-pr ') &&
       contains(github.event.comment.body, '/recheck')

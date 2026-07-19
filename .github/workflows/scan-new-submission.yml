@@ -67,7 +67,12 @@ jobs:
     # `/recheck_dont_actually_check` or a URL) — the "Restrict..." step's word-boundary
     # regex is the real, precise command parse. See remove-plugin-verify.yml, which had
     # the exact same bug (issue #41 misfiring on a URL containing "/submit").
+    #
+    # `state == 'open'` blocks /recheck and /submit once the issue closes (a listing
+    # PR opened, or a maintainer closed it by hand) — recheck-listing-pr.yml is the
+    # only supported path once that's happened, not the closed issue.
     if: >-
+      github.event.issue.state == 'open' &&
       contains(github.event.issue.body, '### pluginInfo.json raw URL') &&
       (github.event_name != 'issue_comment' ||
        contains(github.event.comment.body, '/recheck') ||

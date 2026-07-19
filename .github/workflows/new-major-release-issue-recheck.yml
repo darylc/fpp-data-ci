@@ -165,9 +165,12 @@ jobs:
             }
             const r = data.result;
 
-            // Body is the up-to-date dashboard-style report; keep it fresh so the
-            // issue itself always reflects the latest recheck, not just the comment.
-            await github.rest.issues.update({ owner, repo, issue_number, body: data.body });
+            // Post the up-to-date report as a FRESH comment on every /recheck, rather
+            // than editing the original issue body in place - so each recheck visibly
+            // shows up as a new result in the thread (same convention as
+            // scan-new-submission.yml), instead of silently rewriting history in a
+            // way that's easy to miss or lose track of what changed.
+            await github.rest.issues.createComment({ owner, repo, issue_number, body: data.body });
 
             // Swap the status:<...> label (added by new_major_release_sync_issues.py at creation time).
             const issue = await github.rest.issues.get({ owner, repo, issue_number });
@@ -197,9 +200,31 @@ jobs:
                 .trim();
               await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['needs-manual-review'] });
               const quoted = reason ? `\n\n> ${reason.replace(/\n/g, '\n> ')}` : '\n\n*(no reason given with `/submit`.)*';
+
+              // No verified way yet to identify this repo's actual maintainers (see
+              // the earlier discussion on getCollaboratorPermissionLevel vs a full
+              // collaborators list) - mention, NOT @-mention, the last 5 unique
+              // committers to fpp-data-ci itself as a stand-in until that's resolved.
+              // This is the repo the workflow runs in, so listCommits needs no
+              // special access beyond the default GITHUB_TOKEN.
+              let committerNote = '';
+              try {
+                const { data: commits } = await github.rest.repos.listCommits({ owner, repo, per_page: 30 });
+                const seen = [];
+                for (const c of commits) {
+                  const login = c.author && c.author.login;
+                  if (!login || (c.author.type === 'Bot') || seen.includes(login)) continue;
+                  seen.push(login);
+                  if (seen.length >= 5) break;
+                }
+                if (seen.length) {
+                  committerNote = `\n\nRecent committers to this repo who may be able to help: ${seen.map(l => `\`${l}\``).join(', ')}.`;
+                }
+              } catch (e) { /* best-effort only - don't fail the recheck over this */ }
+
               await github.rest.issues.createComment({ owner, repo, issue_number,
                 body: `Rechecked (${summary}) - flagged for manual review at the owner's request via ` +
-                      `\`/submit\`. Reason given:${quoted}` });
+                      `\`/submit\`. Reason given:${quoted}${committerNote}` });
             } else if (r.certified && r.num_blocker > 0) {
               await github.rest.issues.createComment({ owner, repo, issue_number,
                 body: `Rechecked - declares FPP ${target} compatibility, but still has ${r.num_blocker} ` +

@@ -253,14 +253,13 @@ def issue_body(r, target, draft=True):
     L.append("")
     L.append(f"> ℹ️ FPP's plugin **submission** and **removal** process has been streamlined - see the "
              f"[Plugin Guidelines]({GUIDELINES}) for what's expected of a listed plugin. Adding another "
-             f"plugin? Start at the [guided submission page]({SUBMISSION_GUIDED_PAGE}).")
+             f"plugin? Start at [Submit a plugin]({SUBMISSION_GUIDED_PAGE}).")
     L.append("")
     if r["status"] == "unmaintained":
         push = f"{r['months_since_push']} months" if r["months_since_push"] is not None else "a long time"
         L.append(f"> 💤 No activity in {push} - if you'd like to remove this plugin instead of "
-                 f"updating it, start at the [guided removal page]({REMOVAL_GUIDED_PAGE}) or open a "
-                 f"[Request Plugin Removal]({REMOVAL_FORM}) issue and we'll remove it from the list, "
-                 f"no update needed.")
+                 f"updating it, start at [Request Plugin Removal]({REMOVAL_GUIDED_PAGE}) and we'll "
+                 f"remove it from the list, no update needed.")
         L.append("")
     L.append(f"As part of this new process, in the lead up to each new version release we will create "
              f"a GitHub issue like this one and ask that you review compatibility of your plugin with "
@@ -296,7 +295,7 @@ def issue_body(r, target, draft=True):
     L.append(f"Once you have updated your plugin, please comment `/recheck` on this issue and we will "
              f"automatically scan your plugin and comment the new results here.")
     L.append("")
-    L.append(f"Want to sunset this plugin? Submit removal request at {REMOVAL_GUIDED_PAGE}")
+    L.append(f"Want to sunset this plugin? [Request Plugin Removal]({REMOVAL_GUIDED_PAGE})")
     return "\n".join(L)
 
 

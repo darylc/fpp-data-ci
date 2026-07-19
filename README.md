@@ -15,7 +15,7 @@ guidelines, the `pluginInfo.json` contract, the `pluginList.json` entry
 format, and what CI checks automatically. Two ways in:
 
 1. **[Submit a plugin](https://darylc.github.io/fpp-data-ci/submit_new_plugin/)**
-   (Issue Form, no git needed) - the guided page fills in the form for you and
+   (Issue Form, no git needed) - it fills in the form for you and
    encrypts your contact email.
 2. **Pull Request** - add your entry to `pluginList.json` directly; a CI
    check validates it and comments on the PR.
@@ -27,7 +27,7 @@ working skeleton to fork.
 
 ## Removing a plugin
 
-Start at the [**guided removal page**](https://darylc.github.io/fpp-data-ci/submit_remove_plugin/),
+Start at [**Request Plugin Removal**](https://darylc.github.io/fpp-data-ci/submit_remove_plugin/),
 which fills in the repoName for you (no email involved here, so it's a single step,
 unlike the submission flow above). Existing installs are unaffected; the entry is just
 removed from `pluginList.json`.

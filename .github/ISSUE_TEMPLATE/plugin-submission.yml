@@ -14,7 +14,7 @@
 # A CI check (validate-pluginlist) asserts these two lists still match so they can't drift.
 
 name: "Plugin submission form, access via https://darylc.github.io/fpp-data-ci/submit_new_plugin/"
-description: Do not open this directly - use the guided submission page instead (link at the bottom of the New Issue chooser).
+description: Do not open this directly - use Submit a plugin instead (link at the bottom of the New Issue chooser).
 title: "[New Plugin Submission - do not edit this title]"
 labels: ["plugin", "submission"]
 body:
@@ -82,15 +82,15 @@ body:
     attributes:
       label: Contact token
       description: >
-        Filled in by the
-        **[guided page](https://darylc.github.io/fpp-data-ci/submit_new_plugin/)** - leave it alone.
+        Filled in by
+        **[Submit a plugin](https://darylc.github.io/fpp-data-ci/submit_new_plugin/)** - leave it alone.
 
 
         ⚠️ **Never type your email address here.** This issue is public the instant you submit
         it, so a plain address would be exposed immediately and cannot be un-published. The
         token is your email encrypted in your browser - only FPP maintainers can read it.
       placeholder: |
-        Empty? You arrived here directly. See the link above - go to the guided page first.
+        Empty? You arrived here directly. See the link above - go to Submit a plugin first.
       render: text
     validations:
       required: true

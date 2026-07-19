@@ -6,8 +6,8 @@ for.
 
 There are two ways to submit:
 
-1. **Guided page (easiest - no git needed).** Start at the
-   [**guided submission page**](https://darylc.github.io/fpp-data-ci/submit_new_plugin/), which fills
+1. **Guided page (easiest - no git needed).** Start at
+   [**Submit a plugin**](https://darylc.github.io/fpp-data-ci/submit_new_plugin/), which fills
    in the form for you and encrypts your contact email. A maintainer reviews it and adds your entry.
 2. **Pull Request.** Add your entry to `pluginList.json` directly (details below). A CI check
    validates it automatically.
@@ -128,7 +128,7 @@ right to remove any plugin at any time.
 
 ## Removing your plugin
 
-No longer maintaining it, or don't want it listed anymore? Start at the
-[**guided removal page**](https://darylc.github.io/fpp-data-ci/submit_remove_plugin/), which fills in
+No longer maintaining it, or don't want it listed anymore? Start at
+[**Request Plugin Removal**](https://darylc.github.io/fpp-data-ci/submit_remove_plugin/), which fills in
 the repoName for you (no email involved here, so it's a single step, unlike submitting). Existing
 installs are unaffected; the entry is just removed from `pluginList.json`.

@@ -376,7 +376,11 @@ jobs:
             const repoUrl = '${{ steps.comment.outputs.repo_url }}';
             const registeredOwner = result.owner;
 
-            const lines = [`Adds \`${repoName}\` to \`pluginList.json\`, requested in #${issue_number}.`, ''];
+            // Hidden marker recheck-listing-pr.yml parses to know which plugin/issue
+            // this PR is for, without re-deriving either from the visible prose below
+            // (same pattern as campaign-issue-recheck.yml's `<!-- plugin:... -->`).
+            const lines = [`<!-- listing-pr repo:${repoName} issue:${issue_number} -->`,
+                            `Adds \`${repoName}\` to \`pluginList.json\`, requested in #${issue_number}.`, ''];
             if (repoUrl) lines.push(`**Plugin repo:** ${repoUrl}`);
             lines.push(`**Submitted by:** @${reporter}`);
             if (registeredOwner) {
@@ -408,7 +412,9 @@ jobs:
               'this PR existed — `validate-pluginlist.yml` will only run here if a maintainer pushes a ' +
               'hand-edit to this branch before merging.', '',
               '**Merging is entirely up to a maintainer\'s judgement** — this PR being open is not an approval, ' +
-              'especially if it was opened via `/submit` over unresolved findings above.');
+              'especially if it was opened via `/submit` over unresolved findings above.', '',
+              `_A repo maintainer (or @${reporter}) can comment \`/recheck\` here to re-run the compliance ` +
+              'scan against the repo\'s current state and refresh the findings above._');
             const body = lines.join('\n');
 
             const existing = await github.rest.pulls.list({ owner, repo, head: `${owner}:${branch}`, state: 'open' });

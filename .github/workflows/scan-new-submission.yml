@@ -61,6 +61,12 @@ jobs:
     # for why label-based triggers silently no-op on this repo. For a comment trigger,
     # only run on the actual `/recheck` or `/submit` commands — otherwise every comment
     # on a submission issue (including our own scan results) would re-run this.
+    #
+    # The `contains()` below is a coarse pre-filter (also matches a comment that merely
+    # mentions "/recheck" or "/submit" as a substring, e.g. inside a longer command like
+    # `/recheck_dont_actually_check` or a URL) — the "Restrict..." step's word-boundary
+    # regex is the real, precise command parse. See remove-plugin-verify.yml, which had
+    # the exact same bug (issue #41 misfiring on a URL containing "/submit").
     if: >-
       contains(github.event.issue.body, '### pluginInfo.json raw URL') &&
       (github.event_name != 'issue_comment' ||
@@ -78,7 +84,16 @@ jobs:
               core.setOutput('command', '');
               return;
             }
-            const commandUsed = context.payload.comment.body.includes('/submit') ? 'submit' : 'recheck';
+            const body = context.payload.comment.body;
+            // Word-boundary match, not substring — see the job-level `if:` comment above.
+            const isSubmit = /(?:^|\s)\/submit(?:\s|$)/.test(body);
+            const isRecheck = /(?:^|\s)\/recheck(?:\s|$)/.test(body);
+            if (!isSubmit && !isRecheck) {
+              core.setOutput('ok', 'false');
+              core.setOutput('command', '');
+              return;
+            }
+            const commandUsed = isSubmit ? 'submit' : 'recheck';
             core.setOutput('command', commandUsed);
 
             const commenter = context.payload.comment.user.login;
@@ -165,9 +180,11 @@ jobs:
             // issue the person just opened themselves asking for exactly this feedback.
             const reporter = context.payload.issue.user.login;
 
-            // Which command triggered this run, if any (auto opened/edited => null).
-            const isSubmitOverride = context.eventName === 'issue_comment' &&
-              context.payload.comment.body.includes('/submit');
+            // Which command triggered this run, if any (auto opened/edited => ''). Reuse
+            // the authz step's already-correct (word-boundary, not substring) parse
+            // rather than re-deriving it here — recomputing it independently is exactly
+            // how this drifted out of sync and reintroduced the substring-match bug.
+            const isSubmitOverride = '${{ steps.authz.outputs.command }}' === 'submit';
 
             // repoName/repo/owner are derived server-side by scan_submission.py from
             // pluginInfo.json (authoritative), not taken from the issue body — surfaced

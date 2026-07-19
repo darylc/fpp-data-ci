@@ -27,6 +27,10 @@ permissions:
 
 jobs:
   recheck:
+    # contains() below is a coarse pre-filter (also matches a comment merely mentioning
+    # "/recheck"/"/submit" as a substring, e.g. "/recheck_dont_actually_check" or a URL)
+    # — the extract step's word-boundary regex is the real, precise command parse. See
+    # scan-new-submission.yml / remove-plugin-verify.yml, which had the exact same bug.
     if: >-
       contains(github.event.issue.body, '<!-- plugin:') &&
       (contains(github.event.comment.body, '/recheck') || contains(github.event.comment.body, '/submit'))
@@ -49,7 +53,13 @@ jobs:
             const m = body.match(/<!--\s*plugin:(\S+)\s+campaign:fpp(\d+)\s*-->/);
             core.setOutput('name', m ? m[1] : '');
             core.setOutput('target', m ? m[2] : '');
-            core.setOutput('command', context.payload.comment.body.includes('/submit') ? 'submit' : 'recheck');
+
+            // Word-boundary match, not substring — the job-level `if:` above is only a
+            // coarse pre-filter that also matches e.g. "/recheck_dont_actually_check".
+            const commentBody = context.payload.comment.body;
+            const isSubmit = /(?:^|\s)\/submit(?:\s|$)/.test(commentBody);
+            const isRecheck = /(?:^|\s)\/recheck(?:\s|$)/.test(commentBody);
+            core.setOutput('command', isSubmit ? 'submit' : (isRecheck ? 'recheck' : ''));
 
       - name: Resolve the plugin's registered owner
         id: owner

@@ -297,15 +297,21 @@ def _missing_timeout_hits(root: str, exts=(".php", ".py", ".sh")):
                 break
 
 
-def _device_path_no_allowlist_hits(root: str, exts=(".cpp", ".c", ".h", ".hpp", ".php"), window: int = 20):
+def _device_path_no_allowlist_hits(root: str, exts=(".cpp", ".c", ".h", ".hpp", ".php", ".py"), window: int = 20):
     """Yield (relpath, lineno, line) for a device path built by concatenating a variable
-    (`"/dev/" + var` in C++, `"/dev/".$var` in PHP) with no ttyUSB/ttyACM/ttyAMA allow-list
-    check within `window` lines either side. Whole-file presence isn't enough to clear a
-    hit - a plugin can have an unrelated hardcoded `"ttyUSB0"` default elsewhere (a string,
-    not a validation) hundreds of lines from the actual taint point, or a real allow-list
-    that lives in a completely different file/handler than the one doing the concatenation."""
-    build_rx = re.compile(r'"/dev/"\s*\+\s*\w+|["\']/dev/["\']\s*\.\s*\$\w+')
-    allowlist_rx = re.compile(r'tty(USB|ACM|AMA)', re.I)
+    (`"/dev/" + var` in C++ or Python, `"/dev/".$var` in PHP, `f"/dev/{var}"` in Python)
+    with no ttyUSB/ttyACM/ttyAMA allow-list check within `window` lines either side.
+    Whole-file presence isn't enough to clear a hit - a plugin can have an unrelated
+    hardcoded `"ttyUSB0"` default elsewhere (a string, not a validation) hundreds of
+    lines from the actual taint point, or a real allow-list that lives in a completely
+    different file/handler than the one doing the concatenation."""
+    build_rx = re.compile(r'"/dev/"\s*\+\s*\w+|["\']/dev/["\']\s*\.\s*\$\w+|f["\']/dev/\{\w+')
+    # Optional literal '(' between 'tty' and the alternation: the finding's own
+    # suggested fix ("^tty(USB|ACM|AMA)\d+$") is a regex PATTERN written as
+    # source text, where the '(' is a literal character in that text, not a
+    # regex metacharacter - without tolerating it here, that exact suggested
+    # fix would still trip this same check forever.
+    allowlist_rx = re.compile(r'tty\(?(USB|ACM|AMA)', re.I)
     for path in _iter_files(root, exts):
         rel = os.path.relpath(path, root)
         if _skippable(rel):
@@ -393,8 +399,12 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
     if hit:
         out.append(Finding(BLOCKER, "fppd-restart",
                    f"restarts fppd directly ({hit[0]}:{hit[1]}: `{hit[2]}`) - replace it with "
-                   f"`setSetting restartFlag 1` (shell) or `SetRestartFlag()` (C++), so FPP "
-                   f"restarts safely between sequences instead of killing a running show"))
+                   f"the restart flag instead, so FPP restarts safely between sequences instead of "
+                   f"killing a running show. Shell: source `${{FPPDIR}}/scripts/common` first (it "
+                   f"defines the function), then call `setSetting restartFlag 1`. C++: call "
+                   f"`setSetting(\"restartFlag\", \"1\")` (declared in `settings.h`, already pulled "
+                   f"in via `fpp-pch.h`) - not `SetRestartFlag()`, which is the browser-JS helper "
+                   f"used from PHP pages, not a C++ API"))
 
     # Hitting fppd's raw port 32322 bypasses the documented, Apache-proxied API.
     # Match real URLs (http://host:32322…) AND non-URL socket construction that
@@ -426,11 +436,23 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
     hit = first(r'''(open|file_get_contents|fopen|fgets|cat)\s*\(?\s*['"]?[^'"\n]*media/settings\b'''
                 r'''|['"][^'"\n]*/(channeloutputs\.json|co-[A-Za-z0-9_-]+\.json)''')
     if hit:
+        # Point at the fix for the language the offending file is actually in,
+        # not a generic PHP example that's useless if the hit is a .py/.sh file.
+        if hit[0].endswith(".php"):
+            lang_fix = ("`getSetting('settingName')` - if this file isn't already running inside "
+                        "an FPP page (e.g. it's hit directly, not included by one), add "
+                        "`include_once(\"/opt/fpp/www/common.php\")` first to get it and `$settings`")
+        elif hit[0].endswith(".py"):
+            lang_fix = ("the `/api/settings/<name>` endpoint (e.g. `requests.get(\"http://localhost/"
+                        "api/settings/settingName\")`) - there's no Python helper, just the HTTP API")
+        else:
+            lang_fix = ("the `/api/settings/<name>` endpoint (`curl http://localhost/api/settings/"
+                        "settingName`), or source `${FPPDIR}/scripts/common` and call "
+                        "`getSetting settingName`")
         out.append(Finding(BLOCKER, "core-config",
                    f"reads/writes FPP core config directly ({hit[0]}:{hit[1]}: `{hit[2]}`) - read "
-                   f"it through `getSetting('settingName')` (PHP) or the `/api/settings/<name>` "
-                   f"endpoint instead of parsing the settings file yourself; the file's format is "
-                   f"not a stable contract across FPP releases"))
+                   f"it through {lang_fix} instead of parsing the settings file yourself; the "
+                   f"file's format is not a stable contract across FPP releases"))
 
     # Destructive call (unlink/rm/exec-rm) with no HTTP-method or POST-field
     # guard in that SAME file - reachable via a plain GET, no confirmation.
@@ -687,7 +709,15 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
                        f"becomes part of the command). Fix with `sed -i 's/\\r$//' {rel}` or "
                        f"`dos2unix {rel}`, and configure your editor/git to use LF"))
 
-    # hook exec bits (FPP execs preStart/... directly; non-+x hooks silently don't run)
+    # hook exec bits. All six hooks are gated behind a plain `test -x` in FPP's
+    # own invoker, not `bash script.sh`: preStart/postStart/preStop/postStop via
+    # runPreStartScripts etc. (scripts/functions), fpp_install.sh via
+    # runPluginInstallScript's `[ -x ... ]` (scripts/install_plugin), and
+    # fpp_uninstall.sh the same way (scripts/uninstall_plugin). A non-+x hook of
+    # any of the six is silently skipped entirely - for fpp_uninstall.sh that
+    # means uninstall "succeeds" while every side effect (systemd units, cron
+    # entries, files written outside the plugin dir, running daemons) is left
+    # behind on the host with no error. All six get the same severity.
     for dirpath, dirnames, filenames in os.walk(root):
         if ".git" in dirnames:
             dirnames.remove(".git")
@@ -695,8 +725,7 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
             if fn in HOOKS:
                 p = os.path.join(dirpath, fn)
                 if not os.access(p, os.X_OK):
-                    sev = BLOCKER if fn.startswith(("preStart", "postStart", "preStop", "postStop")) else BEST_PRACTICE
-                    out.append(Finding(sev, "exec-bit",
+                    out.append(Finding(BLOCKER, "exec-bit",
                                f"{os.path.relpath(p, root)} is not executable - commit it +x "
                                f"(git update-index --chmod=+x)"))
 

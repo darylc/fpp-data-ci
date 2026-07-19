@@ -292,6 +292,9 @@ def issue_body(r, target, draft=True):
         for sev, code, msg in sorted(r["findings"], key=lambda f: order.get(f[0], 3)):
             L.append(f"- {badge.get(sev, '')} **{label.get(sev, sev)} - {code}** - {msg}")
         L.append("")
+    L.append(f"If you disagree with the assessment, please comment `/submit` and explain why you "
+             f"disagree or believe your plugin deserves an exception, for the FPP maintainers to evaluate.")
+    L.append("")
     L.append(f"Want to sunset this plugin - submit removal request at {REMOVAL_GUIDED_PAGE}")
     if not draft:
         L.append("")

@@ -54,6 +54,68 @@ jobs:
           python .github/scripts/sync_issues.py \
             --summary out/summary.json --mode reconcile
 
+      - name: Nudge, then escalate, stale tracking issues with no reply
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET: ${{ env.TARGET_MAJOR }}
+        uses: actions/github-script@v7
+        with:
+          # Neither maintainer_candidates (unverified contributor guesses, see
+          # campaign_scan.py) nor an org owner (no individual to @-mention) are
+          # reliable ways to reach anyone - so a tracking issue can sit open forever
+          # with zero engagement. Unlike removal-escalation-sweep.yml, there's no
+          # forced terminal action here (we never auto-remove a plugin just because
+          # its issue went quiet - "want to sunset" is already an opt-in path in the
+          # issue body) - this only nudges, then hands off to a maintainer to decide.
+          #
+          # Anchored on issue.created_at (never changes) rather than updated_at
+          # (which our own nudge comment would bump, silently pushing the escalate
+          # deadline back every run) - so NUDGE_DAYS/ESCALATE_DAYS are both measured
+          # from the same fixed point.
+          script: |
+            const NUDGE_DAYS = 30;
+            const ESCALATE_DAYS = 60;
+            const NUDGE_MARKER = '<!-- campaign-stale-nudge -->';
+            const { owner, repo } = context.repo;
+            const target = process.env.TARGET;
+            const label = `fpp${target}-compat`;
+
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', labels: label, per_page: 100,
+            });
+            core.info(`${issues.length} open FPP ${target} tracking issue(s) to check for staleness.`);
+
+            for (const issue of issues) {
+              if (issue.labels.some(l => l.name === 'needs-manual-review')) continue;
+
+              const ageDays = (Date.now() - new Date(issue.created_at).getTime()) / 86400000;
+              if (ageDays < NUDGE_DAYS) continue;
+
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner, repo, issue_number: issue.number, per_page: 100,
+              });
+              const alreadyNudged = comments.some(c => c.body && c.body.includes(NUDGE_MARKER));
+
+              if (!alreadyNudged) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: issue.number,
+                  body: `${NUDGE_MARKER}\n👋 Friendly reminder - this tracking issue has had no activity in ` +
+                        `${Math.floor(ageDays)} days. Comment \`/recheck\` after updating your plugin, or ` +
+                        `\`/submit\` if you disagree with the findings. With no response, this will be ` +
+                        `flagged for a maintainer to review manually after ${ESCALATE_DAYS} days total.` });
+                core.info(`#${issue.number}: nudged (${Math.floor(ageDays)}d old).`);
+                continue;
+              }
+
+              if (ageDays >= ESCALATE_DAYS) {
+                await github.rest.issues.addLabels({ owner, repo, issue_number: issue.number, labels: ['needs-manual-review'] });
+                await github.rest.issues.createComment({ owner, repo, issue_number: issue.number,
+                  body: `⚠️ No response after ${Math.floor(ageDays)} days (including a reminder) - flagged ` +
+                        `for manual review. A maintainer will decide whether to follow up directly, wait ` +
+                        `longer, or pursue removal.` });
+                core.info(`#${issue.number}: escalated (${Math.floor(ageDays)}d old).`);
+              }
+            }
+
       - name: Upload refreshed dashboard
         uses: actions/upload-artifact@v4
         with:

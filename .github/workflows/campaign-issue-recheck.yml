@@ -63,14 +63,14 @@ jobs:
 
       - name: Resolve the plugin's registered owner
         id: owner
-        if: steps.extract.outputs.name != ''
+        if: steps.extract.outputs.name != '' && steps.extract.outputs.command != ''
         run: |
           python .github/scripts/resolve_plugin_owner.py \
             --plugin-list pluginList.json --repo-name "${{ steps.extract.outputs.name }}"
 
       - name: Restrict /recheck and /submit to that owner
         id: authz
-        if: steps.extract.outputs.name != ''
+        if: steps.extract.outputs.name != '' && steps.extract.outputs.command != ''
         uses: actions/github-script@v7
         with:
           script: |

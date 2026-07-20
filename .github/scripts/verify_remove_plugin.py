@@ -148,7 +148,7 @@ def main():
     # lost by not special-casing self-declared third parties.
 
     owner = None  # only ever set for real by resolve_owner() below; stays None for
-                  # the not-repo_name-at-all path so the GITHUB_OUTPUT write is safe.
+    repo = None   # the not-repo_name-at-all path so the GITHUB_OUTPUT write is safe.
     if not repo_name:
         verdict, msg = "error", "Could not read a **Plugin repoName** from the form."
     else:
@@ -215,6 +215,7 @@ def main():
             # one (not_found/error paths) -- only 'unconfirmed'/'verified' ever have a
             # real value, which is the only case a caller needs it for.
             f.write(f"owner={owner or ''}\n")
+            f.write(f"repo={repo or ''}\n")
             f.write(f"duplicate_issues={','.join(str(n) for n in dupes)}\n")
     print(f"{verdict}: {msg}")
 

@@ -77,14 +77,6 @@ body:
     validations:
       required: true
 
-  - type: textarea
-    id: notes
-    attributes:
-      label: Why the change? (optional)
-      description: Context for the maintainer reviewing the PR this opens.
-    validations:
-      required: false
-
   - type: checkboxes
     id: ack
     attributes:
@@ -92,3 +84,11 @@ body:
       options:
         - label: I understand this only changes how the plugin is filed/browsed - it doesn't affect existing installs.
           required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Why the change? (optional)
+      description: Context for the maintainer reviewing the PR this opens.
+    validations:
+      required: false

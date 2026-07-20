@@ -159,12 +159,14 @@ jobs:
                   execFileSync('git', ['checkout', 'master']);
                 }
 
+                const pluginRepoUrl = plugin.owner && plugin.repo ? `https://github.com/${plugin.owner}/${plugin.repo}` : null;
                 const prBody = [
                   `Removes \`${repoName}\` from \`pluginList.json\` - no response after 7 reminders ` +
                   `(~${nextN * REMINDER_INTERVAL_DAYS} days) on tracking issue #${issue.number} for the FPP ` +
                   `${target} new-major-release scan, and the plugin's highest declared FPP major (${plugin.last_major}) is ` +
                   `more than one version behind (target - 1 = ${target - 1}).`,
                   '',
+                  ...(pluginRepoUrl ? [`**Plugin repo:** ${pluginRepoUrl}`, ''] : []),
                   '**Merging removes the plugin. Closing rejects the removal.** Neither happens automatically - ' +
                   'a maintainer decides.',
                 ].join('\n');

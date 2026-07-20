@@ -294,6 +294,8 @@ jobs:
           NEW_CATEGORY_LONG: ${{ steps.verify.outputs.new_category_long }}
           OLD_CATEGORY: ${{ steps.apply.outputs.old_category }}
           BRANCH: ${{ steps.apply.outputs.branch }}
+          PLUGIN_OWNER: ${{ steps.verify.outputs.owner }}
+          PLUGIN_REPO: ${{ steps.verify.outputs.repo }}
         with:
           script: |
             const { owner, repo } = context.repo;
@@ -303,7 +305,9 @@ jobs:
             const oldCategory = process.env.OLD_CATEGORY;
             const branch = process.env.BRANCH;
             const verdict = '${{ steps.verify.outputs.verdict }}';
-            const registeredOwner = '${{ steps.verify.outputs.owner }}';
+            const registeredOwner = process.env.PLUGIN_OWNER;
+            const pluginRepo = process.env.PLUGIN_REPO;
+            const pluginRepoUrl = registeredOwner && pluginRepo ? `https://github.com/${registeredOwner}/${pluginRepo}` : null;
             const reporter = context.payload.issue.user.login;
 
             // Always open the PR - the ownership check still ran, it just now decides
@@ -318,6 +322,7 @@ jobs:
               `Changes \`${repoName}\`'s category from **${oldCategory}** to **${newCategoryLong}** in ` +
               `\`pluginList.json\`, per category-change request #${issue_number}.`,
               '',
+              ...(pluginRepoUrl ? [`**Plugin repo:** ${pluginRepoUrl}`] : []),
               ownershipLine,
               `**Requested by:** @${reporter}`,
               '',

@@ -296,6 +296,18 @@ jobs:
                 msg.push('',
                          'Push a fix to your repo, then comment `/recheck` here (no need to edit this issue) to re-run the scan. ' +
                          'If you believe these checks are wrong and want a maintainer to look anyway, comment `/submit` instead.');
+                // plugininfo-fetch/no-repo-url specifically mean we couldn't even resolve a
+                // repo from what was entered - that's not a "push a fix" situation (there's
+                // no real repo state to fix yet), it's much more often just a wrong/garbled
+                // pluginInfo.json URL. Editing this issue's description does NOT retrigger a
+                // scan (only /recheck does, and the fix here is a different URL, not a repo
+                // push), so closing and starting over via the guided page is genuinely the
+                // easier path, not just a brush-off.
+                if (findings.some(f => f.code === 'plugininfo-fetch' || f.code === 'no-repo-url')) {
+                  msg.push('',
+                           'If you entered the wrong pluginInfo.json URL, please close this issue and submit a new request at ' +
+                           'https://darylc.github.io/fpp-data-ci/submit_new_plugin/ instead of trying to fix it here.');
+                }
               }
             }
             const optional = cloneFailed ? [] : findings.filter(f => f.severity === 'optional');

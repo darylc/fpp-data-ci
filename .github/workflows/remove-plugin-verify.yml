@@ -303,18 +303,23 @@ jobs:
           # REPO_NAME/BRANCH trace back to attacker-influenceable free text (see the
           # "Escalate..." step above) -- env/process.env rather than ${{ }}-
           # interpolated into the script text, so a value containing a `'` can't break
-          # out of the JS string literal. (OWNER is GitHub-API-derived and thus
-          # charset-constrained by GitHub itself, so it's left as direct
-          # interpolation.)
+          # out of the JS string literal. PLUGIN_OWNER/PLUGIN_REPO are GitHub-API-derived
+          # (charset-constrained by GitHub itself) but passed via env too, for the same
+          # "plugin repo" vs. this repo's own `owner`/`repo` naming clash `context.repo`
+          # already destructures below.
           REPO_NAME: ${{ steps.verify.outputs.repo_name }}
           BRANCH: ${{ steps.escalate.outputs.branch }}
+          PLUGIN_OWNER: ${{ steps.verify.outputs.owner }}
+          PLUGIN_REPO: ${{ steps.verify.outputs.repo }}
         with:
           script: |
             const { owner, repo } = context.repo;
             const issue_number = context.payload.issue.number;
             const repoName = process.env.REPO_NAME;
             const branch = process.env.BRANCH;
-            const registeredOwner = '${{ steps.verify.outputs.owner }}';
+            const registeredOwner = process.env.PLUGIN_OWNER;
+            const pluginRepo = process.env.PLUGIN_REPO;
+            const pluginRepoUrl = registeredOwner && pluginRepo ? `https://github.com/${registeredOwner}/${pluginRepo}` : null;
             const reporter = context.payload.issue.user.login;
 
             const lines = [
@@ -322,6 +327,7 @@ jobs:
               `confirmed for removal request #${issue_number}, so this was escalated via \`/submit\`.`,
               '',
             ];
+            if (pluginRepoUrl) lines.push(`**Plugin repo:** ${pluginRepoUrl}`);
             if (registeredOwner) lines.push(`**Registered owner (from srcURL):** \`${registeredOwner}\``);
             lines.push(`**Requested by:** @${reporter}`, '');
             lines.push(

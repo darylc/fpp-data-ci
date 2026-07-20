@@ -116,6 +116,7 @@ def main():
     # way regardless of the answer.
 
     owner = None
+    repo = None
     new_category_short = ""
     if not repo_name:
         verdict, msg = "error", "Could not read a **Plugin repoName** from the form."
@@ -177,6 +178,7 @@ def main():
             f.write(f"verdict={verdict}\n")
             f.write(f"repo_name={repo_name}\n")
             f.write(f"owner={owner or ''}\n")
+            f.write(f"repo={repo or ''}\n")
             f.write(f"new_category={new_category_short}\n")
             f.write(f"new_category_long={new_category_long}\n")
             f.write(f"duplicate_issues={','.join(str(n) for n in dupes)}\n")

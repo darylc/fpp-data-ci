@@ -34,9 +34,10 @@ from dataclasses import dataclass
 # wherever jsonschema isn't installed.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
-    from lib_plugin_schema import schema_validation_error
+    from lib_plugin_schema import schema_validation_error, parse_github_repo
 except ImportError:
     schema_validation_error = None
+    parse_github_repo = None
 
 BLOCKER, BEST_PRACTICE, OPTIONAL = "blocker", "best-practice", "optional"
 
@@ -859,6 +860,25 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
                    f"command triggered it. Set `CURLOPT_TIMEOUT`/`CURLOPT_CONNECTTIMEOUT` (PHP "
                    f"curl), the `'timeout'` key (PHP stream contexts), or `timeout=` (Python "
                    f"`requests`)"))
+
+    # repoName must match the actual GitHub repo name (CONTRIBUTING.md: "must match
+    # your GitHub repo name and your pluginList.json entry name"). validate_pluginlist.py
+    # already checks the pluginList.json half of that (repoName vs. the registered
+    # listing name); this is the other half, which nothing previously checked. It's easy
+    # to miss because nothing breaks visibly - FPP installs into
+    # ${PLUGINDIR}/${repoName} regardless of what the repo is actually called (see
+    # InstallPluginFromInfo() in www/api/controllers/plugin.php), so a mismatch only
+    # shows up as confusion later (support, docs, anyone cross-referencing the repo).
+    if info is not None and parse_github_repo is not None:
+        declared = (info.get("repoName") or "").strip()
+        src = parse_github_repo(info.get("srcURL", "") or "")
+        if declared and src and declared.lower() != src[1].lower():
+            out.append(Finding(BEST_PRACTICE, "reponame-mismatch",
+                       f"pluginInfo.json's repoName (`{declared}`) doesn't match the actual GitHub "
+                       f"repo name (`{src[1]}`, parsed from srcURL) - CONTRIBUTING.md requires them "
+                       f"to match. Rename the GitHub repo to `{declared}` (Settings > repository name) "
+                       f"or change repoName to `{src[1]}`, whichever is the real name here - just make "
+                       f"sure pluginList.json's listing name is updated to match too."))
 
     # --- repo hygiene --------------------------------------------------------
     if not any(n.startswith(("license", "copying")) for n in lower):

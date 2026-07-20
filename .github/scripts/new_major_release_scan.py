@@ -162,6 +162,7 @@ def scan_plugin(entry, target, plugins_dir, token, schema):
     owner_is_org = False
     maintainer_candidates = []
     meta = {}
+    repo = None
     src = lib.parse_github_repo(info.get("srcURL", "") or "")
     if src:
         owner, repo = src
@@ -198,6 +199,7 @@ def scan_plugin(entry, target, plugins_dir, token, schema):
     return {
         "name": name,
         "owner": owner,
+        "repo": repo,
         "owner_is_org": owner_is_org,
         "maintainer_candidates": maintainer_candidates,
         "status": status,
@@ -231,6 +233,8 @@ def issue_body(r, target, draft=True):
         L.append(f"> **DRY RUN - draft only. The maintainer has NOT been notified.**")
         L.append("")
     L.append(f"## {r['name']} - FPP {target} readiness")
+    if r.get("owner") and r.get("repo"):
+        L.append(f"Repo: https://github.com/{r['owner']}/{r['repo']}")
     if r["owner"]:
         mention = "not @-mentioned in this dry run" if draft else "not @-mentioned - see MENTION_OWNER"
         if r.get("owner_is_org"):

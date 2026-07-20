@@ -15,7 +15,7 @@
             [ "fpp-arcade", "https://raw.githubusercontent.com/FalconChristmas/fpp-arcade/master/pluginInfo.json", "Hardware" ],
             [ "fpp-midi", "https://raw.githubusercontent.com/FalconChristmas/fpp-midi/master/pluginInfo.json", "Audio" ],
             [ "fpp-osc", "https://raw.githubusercontent.com/FalconChristmas/fpp-osc/master/pluginInfo.json", "Home Automation" ],
-            [ "fpp-HomeAssistant", "https://raw.githubusercontent.com/FalconChristmas/fpp-HomeAssistant/master/pluginInfo.json", "Home Automation" ],
+            [ "fpp-HomeAssistant", "https://raw.githubusercontent.com/FalconChristmas/fpp-HomeAssistant/master/pluginInfo.json", "Display & Video" ],
             [ "fpp-VideoCapture", "https://raw.githubusercontent.com/FalconChristmas/fpp-VideoCapture/master/pluginInfo.json", "Display & Video" ],
             [ "fpp-smpte", "https://raw.githubusercontent.com/FalconChristmas/fpp-smpte/master/pluginInfo.json", "Monitoring" ],
             [ "fpp-ArtNetAdv", "https://raw.githubusercontent.com/FalconChristmas/fpp-ArtNetAdv/master/pluginInfo.json", "Monitoring" ],

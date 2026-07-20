@@ -300,10 +300,15 @@ def _missing_timeout_hits(root: str, exts=(".php", ".py", ".sh")):
             # fails fast rather than hanging on cross-network TCP retries - the
             # remaining risk (fppd alive but wedged) doesn't clear the bar here.
             is_install_script = os.path.basename(path) in ("fpp_install.sh", "fpp_uninstall.sh")
+            # Match curl only where it's actually being invoked as a command (start
+            # of line, after ;&| / sudo/then/do, or a $()/backtick substitution) -
+            # not anywhere the bare word "curl" appears, which also matches it as an
+            # apt-get/pip package name being installed (e.g. `apt-get install curl`).
+            curl_cmd_rx = re.compile(r'(^|[;&|]|\$\(|`|\bsudo\s+|\bthen\s+|\bdo\s+)\s*curl\b')
             for i, line in enumerate(text.splitlines(), 1):
                 if _is_comment_line(line):
                     continue
-                if not re.search(r'\bcurl\b', line) or re.search(r'--max-time\b|-m\s+\d|--connect-timeout\b', line):
+                if not curl_cmd_rx.search(line) or re.search(r'--max-time\b|-m\s+\d|--connect-timeout\b', line):
                     continue
                 if is_install_script and re.search(r'://(localhost|127\.0\.0\.1)\b', line):
                     continue

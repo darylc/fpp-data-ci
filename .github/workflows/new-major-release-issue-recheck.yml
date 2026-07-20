@@ -267,7 +267,7 @@ jobs:
             } else if (r.certified && r.num_blocker > 0) {
               await github.rest.issues.createComment({ owner, repo, issue_number,
                 body: `Rechecked - declares FPP ${target} compatibility, but still has ${r.num_blocker} ` +
-                      `blocker finding(s) to resolve before this can close. See the updated report above.` });
+                      `blocker issues that must be fixed. See the updated report above.` });
             } else {
               await github.rest.issues.createComment({ owner, repo, issue_number,
                 body: `Rechecked (${summary}) - see the updated report above. Comment \`/recheck\` again ` +

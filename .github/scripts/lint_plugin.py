@@ -44,6 +44,13 @@ HOOKS = ("fpp_install.sh", "fpp_uninstall.sh", "preStart.sh", "postStart.sh",
          "preStop.sh", "postStop.sh")
 SCRIPT_EXT = (".sh", ".py", ".php")
 
+# Files fppd actually executes as root (fppd.service has no User=, so it and
+# everything it shells out to - runPreStartScripts/install_plugin/
+# upgrade_plugin/uninstall_plugin - runs as root). Everything else (cmd.php and
+# other runtime request-handler scripts) runs as the `fpp` user, where sudo can
+# be legitimate.
+SUDO_SCOPE = HOOKS + ("fpp_upgrade.sh",)
+
 
 @dataclass
 class Finding:
@@ -617,11 +624,27 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
         out.append(Finding(BLOCKER, "world-writable",
                    f"loosens permissions to world-writable ({hit[0]}:{hit[1]}: `{hit[2]}`) - {advice}"))
 
-    # sudo is just as much a guideline violation from PHP/Python (exec/shell_exec/
-    # system) or a Makefile (reached transitively via preStart's `make`) as from a
-    # .sh script - the original .sh-only scope was a blind spot, not a design
-    # choice. Makefiles have no extension, so they need a separate direct check.
-    hit = first(r'\bsudo\b', exts=SCRIPT_EXT)
+    # sudo is a guideline violation only in the files fppd runs as root (the
+    # install/upgrade/uninstall/pre-post hooks, or a Makefile reached
+    # transitively via one of them) - everywhere else (cmd.php and other
+    # runtime request-handler scripts) runs as the `fpp` user, where sudo can
+    # be legitimate. Scope by filename, not extension, so those runtime
+    # scripts aren't flagged.
+    hit = None
+    for dirpath, dirnames, filenames in os.walk(root):
+        if ".git" in dirnames:
+            dirnames.remove(".git")
+        for fn in filenames:
+            if fn in SUDO_SCOPE:
+                body = _read(os.path.join(dirpath, fn))
+                m = re.search(r'\bsudo\b', body)
+                if m:
+                    lineno = body[:m.start()].count("\n") + 1
+                    hit = (os.path.relpath(os.path.join(dirpath, fn), root), lineno,
+                           body.splitlines()[lineno - 1].strip())
+                    break
+        if hit:
+            break
     if hit is None:
         for cand in ("Makefile", "makefile"):
             p = os.path.join(root, cand)

@@ -407,8 +407,8 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
         out.append(Finding(BLOCKER, "remote-exec",
                    f"pipes a remote script into a shell ({hit[0]}:{hit[1]}: `{hit[2]}`) - install "
                    f"the dependency through a package manager FPP already has instead: `apt-get "
-                   f"install` for system packages, `npm install` for Node packages, or `uv pip "
-                   f"install --system` for Python packages. Only if there's genuinely no package for it, "
+                   f"install` for system packages, `npm install` for Node packages, or `pip install "
+                   f"--break-system-packages` for Python packages. Only if there's genuinely no package for it, "
                    f"download the installer to a file, verify its checksum, then run it, e.g. "
                    f"`curl -fsSLo installer.sh https://example.com/install.sh && "
                    f"echo \"<sha256>  installer.sh\" | sha256sum -c && bash installer.sh`"))
@@ -455,19 +455,34 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
                    f"replace `http://localhost:32322/...` with the proxied, documented equivalent "
                    f"at `http://localhost/api/...` instead"))
 
-    hit = first(r'pip3?\s+install[^\n]*--break-system-packages')
+    # `pip install` with no `--break-system-packages` isn't just against
+    # convention - on any current PEP 668-managed image (Debian/RPi OS
+    # Bookworm+) it fails outright ("externally managed environment"),
+    # verified directly against a real PEP-668-enforcing system. The flag is
+    # safe to add: it installs into /usr/local/lib/python3.x/dist-packages,
+    # which is NOT tracked by dpkg (apt-installed python3-* packages live in
+    # /usr/lib/python3/dist-packages instead, a different directory) - so it
+    # doesn't touch anything apt manages, despite the scary-sounding name.
+    # (This used to recommend switching to `uv pip install --system` instead,
+    # believing that avoided needing the flag entirely - it doesn't; `uv
+    # pip install --system` hits the identical PEP 668 refusal and needs the
+    # same flag, confirmed directly against a real system.)
+    #
+    # Checks each `pip install` hit individually, not just the first one in
+    # the tree (`first()` alone would miss a bare `pip install` anywhere after
+    # an earlier, compliant `pip install --break-system-packages` line - a
+    # real false-negative gap, not hypothetical, worth closing now that this
+    # is a BLOCKER rather than a BEST_PRACTICE).
+    hit = next((h for h in _grep(root, r'\bpip3?\s+install\b')
+                if "--break-system-packages" not in h[2]), None)
     if hit:
-        out.append(Finding(BLOCKER, "break-system-packages",
-                   f"pip --break-system-packages corrupts the system Python ({hit[0]}:{hit[1]}: "
-                   f"`{hit[2]}`) - use `uv pip install --system ...` instead, so the package installs "
-                   f"into the system interpreter without corrupting it"))
-
-    hit = first(r'\bpip3?\s+install\b')
-    if hit and "--break-system-packages" not in hit[2]:
-        out.append(Finding(BEST_PRACTICE, "pip-install",
-                   f"installs Python packages with pip ({hit[0]}:{hit[1]}: `{hit[2]}`) - use "
-                   f"`uv pip install --system` instead, so the dependency resolves and installs the "
-                   f"same way FPP itself manages Python packages"))
+        out.append(Finding(BLOCKER, "pip-install",
+                   f"installs Python packages with pip but no --break-system-packages "
+                   f"({hit[0]}:{hit[1]}: `{hit[2]}`) - this fails outright on any current PEP "
+                   f"668-managed image ('externally managed environment'). Add "
+                   f"`--break-system-packages`: it's safe here because pip targets "
+                   f"`/usr/local/lib/python3.x/dist-packages`, which isn't tracked by dpkg, so it "
+                   f"can't conflict with anything apt manages"))
 
     # Reading/parsing FPP's raw core config directly (the settings file, channel
     # outputs) is fragile - use getSetting()/$settings/the API. Writing your OWN

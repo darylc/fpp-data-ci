@@ -19,3 +19,6 @@ contact_links:
   - name: 🗑️ Request Plugin Removal - start here (guided)
     url: https://darylc.github.io/fpp-data-ci/submit_remove_plugin/
     about: Fills in the repoName for you. No email involved, so it's a single step - no encryption needed.
+  - name: 🏷️ Request Category Change - start here (guided)
+    url: https://darylc.github.io/fpp-data-ci/change_plugin_category/
+    about: Fills in the repoName for you. No email involved, so it's a single step - no encryption needed.

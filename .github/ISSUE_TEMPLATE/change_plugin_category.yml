@@ -1,0 +1,96 @@
+# GitHub Issue Form - "Request Plugin Category Change".
+#
+# WHAT THIS IS: for an author who wants their already-listed plugin filed under a
+# different pluginCategories.json category than it currently is (miscategorized at
+# submission time, or the plugin's scope changed since). Ownership is verified the
+# same way removal is (compare the issue author's GitHub login against the plugin's
+# registered owner) - but unlike removal there's no delist:true-style self-proof field
+# an org-repo owner can push to confirm control, so an unconfirmed request always needs
+# a maintainer's manual review rather than an automated fallback. A verified request
+# gets a pull request opened automatically (never a direct commit - a category change
+# doesn't carry removal's "you already proved you own this, nothing left to gate"
+# urgency, so a maintainer still reviews before it lands).
+#
+# WHERE IT LIVES: FalconChristmas/fpp-data/.github/ISSUE_TEMPLATE/change_plugin_category.yml
+#
+# NOTE ON THE CATEGORY DROPDOWN: same hand-kept-copy caveat as plugin-submission.yml's
+# `category` field - check_category_drift.py asserts both stay in sync with
+# pluginCategories.json.
+
+name: Request Plugin Category Change
+description: Ask that your plugin be listed under a different category.
+title: "[Change plugin category request]"
+labels: ["plugin", "category-change-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form to move your already-listed plugin to a different
+        `pluginCategories.json` category - for example if it was filed under the wrong
+        one at submission time, or its scope has grown since.
+
+  - type: dropdown
+    id: reporterType
+    attributes:
+      label: Are you the plugin's author/maintainer?
+      description: >
+        Context for whoever reviews this issue - it doesn't change what happens next.
+        Ownership is verified the same way either way: your GitHub login is checked
+        against the plugin's registered owner. Can't be confirmed automatically (e.g.
+        an org-owned repo)? Comment `/submit` after opening the issue to flag it for a
+        maintainer instead - there's no self-proof field for this one, unlike removal's
+        `delist: true`.
+      options:
+        - "Yes - I am the author/maintainer (or authorized on their behalf)"
+        - "No - I'm a third party reporting this as miscategorized"
+    validations:
+      required: true
+
+  - type: input
+    id: repoName
+    attributes:
+      label: Plugin repoName
+      description: >
+        The `repoName` as it appears in pluginList.json - or just paste your
+        GitHub repo URL / pluginInfo.json URL, we'll figure out the repoName.
+      placeholder: fpp-my-plugin
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: New category
+      description: >
+        Which category should this plugin move to? (Copied from pluginCategories.json
+        - the canonical list. If none fit well, pick the closest and mention it below.)
+      options:
+        - Audio, Music & FM/RDS
+        - Viewer Interaction & Show Requests
+        - Payments & Donations
+        - Messaging, Signage & Countdown
+        - Data Feeds & Information
+        - Home Automation & Integrations
+        - Notifications & Communication
+        - Hardware, Controls & Animatronics
+        - Display, Video & Capture
+        - Monitoring & System Tools
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Why the change? (optional)
+      description: Context for the maintainer reviewing the PR this opens.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: ack
+    attributes:
+      label: Confirmation
+      options:
+        - label: I understand this only changes how the plugin is filed/browsed - it doesn't affect existing installs.
+          required: true

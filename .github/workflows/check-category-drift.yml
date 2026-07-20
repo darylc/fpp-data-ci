@@ -16,6 +16,7 @@ on:
     paths:
       - "pluginCategories.json"
       - ".github/ISSUE_TEMPLATE/plugin-submission.yml"
+      - ".github/ISSUE_TEMPLATE/change_plugin_category.yml"
       - ".github/scripts/check_category_drift.py"
       - ".github/workflows/check-category-drift.yml"
   workflow_dispatch:
@@ -40,4 +41,5 @@ jobs:
         run: |
           python .github/scripts/check_category_drift.py \
             --categories pluginCategories.json \
-            --form .github/ISSUE_TEMPLATE/plugin-submission.yml
+            --form .github/ISSUE_TEMPLATE/plugin-submission.yml \
+            --form .github/ISSUE_TEMPLATE/change_plugin_category.yml

@@ -3,11 +3,12 @@
 
 WHY THIS EXISTS
 ---------------
-pluginCategories.json is the single source of truth, but
-.github/ISSUE_TEMPLATE/plugin-submission.yml can't read it at render time - GitHub
-Issue Forms are static YAML - so its dropdown is a hand-kept copy. Add a category
-upstream and the form silently offers a stale list forever, with no error anywhere.
-This check is what stops that. Exits non-zero on mismatch.
+pluginCategories.json is the single source of truth, but any Issue Form's dropdown
+(currently plugin-submission.yml and change_plugin_category.yml) can't read it at
+render time - GitHub Issue Forms are static YAML - so each is a hand-kept copy. Add a
+category upstream and a form silently offers a stale list forever, with no error
+anywhere. This check is what stops that. Exits non-zero on any mismatch, across every
+--form given.
 
 The dropdown shows longName, not name: a static YAML dropdown has no separate
 label/value, so its options ARE what gets submitted, and GitHub Issue Forms cannot
@@ -22,7 +23,8 @@ reason - the submitter picks Category on the real GitHub form instead.)
 
 Usage:
   check_category_drift.py --categories pluginCategories.json \
-      --form .github/ISSUE_TEMPLATE/plugin-submission.yml
+      --form .github/ISSUE_TEMPLATE/plugin-submission.yml \
+      --form .github/ISSUE_TEMPLATE/change_plugin_category.yml
 """
 import argparse
 import json
@@ -68,7 +70,8 @@ def report(label, truth, actual, errors):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--categories", required=True)
-    ap.add_argument("--form", required=True)
+    ap.add_argument("--form", required=True, action="append",
+                     help="path to an Issue Form YAML with a 'category' dropdown; repeatable")
     args = ap.parse_args()
 
     truth_long = load_source_of_truth_long(args.categories)
@@ -76,7 +79,8 @@ def main():
     print(f"  {', '.join(truth_long)}\n")
 
     errors = []
-    report("Issue Form dropdown", truth_long, load_form_dropdown(args.form), errors)
+    for form_path in args.form:
+        report(form_path, truth_long, load_form_dropdown(form_path), errors)
 
     if errors:
         print("\nCategory lists have drifted. pluginCategories.json is the source of truth -")

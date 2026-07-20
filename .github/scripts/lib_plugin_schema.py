@@ -251,6 +251,15 @@ def load_categories(path: str) -> set[str]:
     return {c["name"] for c in data.get("categories", [])}
 
 
+def load_category_map(path: str) -> dict[str, str]:
+    """{longName: shortName, ...} - pluginList.json stores shortName, but Issue Form
+    dropdowns (a static YAML copy, see check_category_drift.py) show longName, so
+    anything mapping a submitted form value back onto a pluginList.json entry needs
+    this both ways."""
+    data = json.load(open(path, encoding="utf-8"))
+    return {c["longName"]: c["name"] for c in data.get("categories", []) if c.get("longName")}
+
+
 def load_pluginlist(path: str) -> list[list]:
     """Load pluginList.json and return its `pluginList` array (raises on parse error)."""
     with open(path, encoding="utf-8") as f:

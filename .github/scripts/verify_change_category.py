@@ -7,12 +7,13 @@ category is even a real change.
 
 Verdicts:
   verified        - issue author == the repo owner parsed from the plugin's registered
-                     pluginInfo.json URL (personal repo). change-category-verify.yml
-                     opens a PR for this - never a direct commit (see the Issue Form's
-                     header comment for why).
+                     pluginInfo.json URL (personal repo).
   unconfirmed     - repo is org-owned or the author isn't the owner. Unlike removal's
-                     delist:true, there's no self-proof field for this one - the only
-                     path forward is `/submit` for a maintainer to decide by hand.
+                     delist:true, there's no self-proof field for this one - but unlike
+                     removal, that's fine here: change-category-verify.yml opens a PR
+                     either way (verified or unconfirmed), never a direct commit, so a
+                     maintainer always makes the actual call. This verdict only changes
+                     what the PR body says about ownership, not whether one gets opened.
   not_found       - the named repoName isn't in pluginList.json at all.
   same_category   - the requested category already matches what's on file; nothing to do.
   unknown_category- the "New category" value isn't one of pluginCategories.json's
@@ -160,9 +161,9 @@ def main():
             else:
                 verdict, msg = "unconfirmed", (
                     f"{field_block(repo_name, current_category, new_category_long, owner, repo)}\n\n"
-                    f"⚠️ **@{author}** is not the direct owner (it may be org-owned). Unlike a removal "
-                    f"request, there's no self-proof field for this one - if you believe this change "
-                    f"is legitimate, comment `/submit` to flag it for a maintainer to decide by hand.")
+                    f"⚠️ **@{author}** is not the direct owner (it may be org-owned). Opening a pull "
+                    f"request anyway, noting that ownership could not be automatically confirmed - a "
+                    f"maintainer will decide whether to merge it.")
 
     dupes: list[int] = []
     if repo_name and args.gh_repo and args.current_issue:

@@ -69,13 +69,11 @@
       <li>On the next page, pick the new category and tell us why, then submit the issue.</li>
       <li><strong>Ownership is checked automatically</strong> for everyone (it compares
           your GitHub login against the plugin repo's owner).</li>
-      <li>Confirmed? A pull request is opened automatically applying the change - a
-          maintainer still reviews and merges it (unlike removal, this never commits
-          directly).</li>
-      <li>Can't be confirmed automatically (e.g. an org-owned repo, or you're
-          reporting someone else's plugin as miscategorized)? There's no
-          proof-of-control field for this one - comment <code>/submit</code> on the
-          issue to flag it for a maintainer to decide by hand instead.</li>
+      <li>Either way, <strong>a pull request is opened automatically</strong> applying
+          the change - a maintainer reviews and merges it (this never commits
+          directly). If ownership couldn't be confirmed (e.g. an org-owned repo, or
+          you're reporting someone else's plugin as miscategorized), the PR says so
+          plainly, so the maintainer decides with that in mind.</li>
     </ol>
   </div>
 

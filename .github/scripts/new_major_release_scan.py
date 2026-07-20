@@ -198,6 +198,12 @@ def scan_plugin(entry, target, plugins_dir, token, schema):
     num_blocker = sum(1 for s, _, _ in findings if s == BLOCKER)
     return {
         "name": name,
+        # pluginInfo.json's OWN "name" field - the human-readable title shown on the
+        # Plugin Manager card (e.g. "Live Follow"), distinct from `name` above (the
+        # repoName, e.g. "fpp-live-follow", used for the issue heading/title). Not
+        # every plugin's repoName reads as an obvious display name, so this is worth
+        # surfacing separately for a maintainer skimming the issue.
+        "display_name": (info.get("name") or "").strip() or None,
         "owner": owner,
         "repo": repo,
         "owner_is_org": owner_is_org,
@@ -233,6 +239,8 @@ def issue_body(r, target, draft=True):
         L.append(f"> **DRY RUN - draft only. The maintainer has NOT been notified.**")
         L.append("")
     L.append(f"## {r['name']} - FPP {target} readiness")
+    if r.get("display_name") and r["display_name"] != r["name"]:
+        L.append(f"Plugin name: {r['display_name']}")
     if r.get("owner") and r.get("repo"):
         L.append(f"Repo: https://github.com/{r['owner']}/{r['repo']}")
     if r["owner"]:

@@ -1,21 +1,29 @@
-# Verify a plugin category-change request and, once ownership is confirmed, open a
-# PR that applies it.
+# Verify a plugin category-change request, then open a PR that applies it - in EVERY
+# case, verified ownership or not. The ownership check still runs and its result is
+# never silently dropped: it's what the PR body tells the maintainer ("owner
+# confirmed" vs "NOT verified, decide accordingly"), so the maintainer merging or
+# closing the PR is an informed human decision either way, not an automated one.
 #
 # When a `category-change-request` issue is opened/edited, GitHub has already
 # authenticated the submitter, so we know their real login. This checks it against the
 # plugin's registered repo owner and posts a sticky comment + a verdict label:
-#   category-verified    submitter owns the repo - a PR is opened to apply the change
-#   category-unconfirmed  org repo → needs /submit for a maintainer to decide by hand
-#   category-not-listed   repoName isn't in pluginList.json at all
-#   category-same          requested category already matches what's on file
-#   category-unknown       "New category" isn't a real pluginCategories.json entry
-#   category-change-error error other than the above (usually transient - fetch failed)
+#   category-verified    submitter owns the repo - PR notes ownership confirmed
+#   category-unconfirmed  org repo / mismatch - PR notes ownership NOT verified
+#   category-not-listed   repoName isn't in pluginList.json at all - no PR, auto-closed
+#   category-same          requested category already matches what's on file - no PR, auto-closed
+#   category-unknown       "New category" isn't a real pluginCategories.json entry - no PR
+#   category-change-error error other than the above (usually transient - fetch failed) - no PR
+#
+# Only `verified`/`unconfirmed` have an actual change to apply, so only those two open
+# a PR. The other four verdicts mean there's nothing (yet) to build a diff from - a
+# nonexistent listing, a no-op change, or bad/incomplete input - so they're handled by
+# closing (not_found/same_category) or flagging for manual review (unknown_category/
+# error) instead of a PR with nothing in it.
 #
 # UNLIKE remove-plugin-verify.yml: even a `verified` request never commits directly -
-# it opens a PR for a maintainer to merge. And `unconfirmed` has no delist:true-style
-# self-proof path and no 7-day auto-escalation sweep - it's manual review via /submit
-# or nothing, by design (see change_plugin_category.yml's header comment). That keeps
-# this workflow self-contained with no companion sweep workflow needed.
+# it opens a PR for a maintainer to merge, same as `unconfirmed`. Category change never
+# had removal's "already proved you own this, nothing left to gate" urgency, so there's
+# no reason to fast-path a direct commit for one ownership outcome but not the other.
 #
 # The issue title (including repoName) is set client-side by the guided page
 # (docs/change_plugin_category/) via the `title` prefill query param, same as
@@ -25,9 +33,10 @@
 # (unchanged) issue body - e.g. useful after editing a typo'd repoName, or after the
 # category dropdown is fixed for an `unknown_category` verdict.
 #
-# OVERRIDING: `/submit` flags the issue `needs-manual-review` for a maintainer to
-# decide by hand - same idea as remove-plugin-verify.yml's override, but here it never
-# auto-opens a PR (see above).
+# OVERRIDING: `/submit` only matters for `error`/`unknown_category` now (nothing to
+# apply yet) - it flags the issue `needs-manual-review` for a maintainer to decide by
+# hand, same idea as remove-plugin-verify.yml's override. `verified`/`unconfirmed`
+# don't need it: a PR already opens automatically either way.
 #
 # AUTHZ: /recheck and /submit only take effect from the issue's original reporter (or
 # a fpp-data-ci maintainer) - see the "Restrict..." step below.
@@ -177,8 +186,7 @@ jobs:
       - name: /submit override
         if: >-
           steps.authz.outputs.ok == 'true' && steps.authz.outputs.command == 'submit' &&
-          (steps.verify.outputs.verdict == 'unconfirmed' || steps.verify.outputs.verdict == 'error' ||
-           steps.verify.outputs.verdict == 'unknown_category')
+          (steps.verify.outputs.verdict == 'error' || steps.verify.outputs.verdict == 'unknown_category')
         uses: actions/github-script@v7
         with:
           script: |
@@ -234,7 +242,7 @@ jobs:
                     `we'll flag it for a maintainer instead.`});
             await github.rest.issues.update({owner, repo, issue_number, state: 'closed'});
 
-      # --- from here on: only for a verified request ---------------------------
+      # --- from here on: verified OR unconfirmed - both get a PR ---------------
       # REPO_NAME/NEW_CATEGORY trace back to attacker-influenceable free text (the
       # issue form's repoName input and category dropdown) - passed via env and
       # referenced as $VAR/process.env.VAR rather than ${{ }}-interpolated directly
@@ -244,7 +252,9 @@ jobs:
 
       - name: Apply category change on a branch
         id: apply
-        if: steps.authz.outputs.ok == 'true' && steps.verify.outputs.verdict == 'verified'
+        if: >-
+          steps.authz.outputs.ok == 'true' &&
+          (steps.verify.outputs.verdict == 'verified' || steps.verify.outputs.verdict == 'unconfirmed')
         env:
           REPO_NAME: ${{ steps.verify.outputs.repo_name }}
           NEW_CATEGORY_LONG: ${{ steps.verify.outputs.new_category_long }}
@@ -275,12 +285,14 @@ jobs:
 
       - name: Open or update PR
         if: >-
-          steps.authz.outputs.ok == 'true' && steps.verify.outputs.verdict == 'verified' &&
+          steps.authz.outputs.ok == 'true' &&
+          (steps.verify.outputs.verdict == 'verified' || steps.verify.outputs.verdict == 'unconfirmed') &&
           startsWith(steps.apply.outputs.status, 'changed')
         uses: actions/github-script@v7
         env:
           REPO_NAME: ${{ steps.verify.outputs.repo_name }}
           NEW_CATEGORY_LONG: ${{ steps.verify.outputs.new_category_long }}
+          OLD_CATEGORY: ${{ steps.apply.outputs.old_category }}
           BRANCH: ${{ steps.apply.outputs.branch }}
         with:
           script: |
@@ -288,26 +300,40 @@ jobs:
             const issue_number = context.payload.issue.number;
             const repoName = process.env.REPO_NAME;
             const newCategoryLong = process.env.NEW_CATEGORY_LONG;
+            const oldCategory = process.env.OLD_CATEGORY;
             const branch = process.env.BRANCH;
+            const verdict = '${{ steps.verify.outputs.verdict }}';
             const registeredOwner = '${{ steps.verify.outputs.owner }}';
             const reporter = context.payload.issue.user.login;
 
+            // Always open the PR - the ownership check still ran, it just now decides
+            // what this line says instead of whether a PR happens at all. That's the
+            // one thing a maintainer needs to make an informed merge/close call.
+            const ownershipLine = verdict === 'verified'
+              ? `**Owner:** \`${registeredOwner}\` - ✅ confirmed (matches requester)`
+              : `**Owner:** ${registeredOwner ? `\`${registeredOwner}\`` : '(could not be determined)'} - ` +
+                `⚠️ **NOT verified** (org-owned repo, or requester doesn't match the registered owner)`;
+
             const lines = [
-              `Changes \`${repoName}\`'s category to **${newCategoryLong}** in \`pluginList.json\`, ` +
-              `per verified category-change request #${issue_number}.`,
+              `Changes \`${repoName}\`'s category from **${oldCategory}** to **${newCategoryLong}** in ` +
+              `\`pluginList.json\`, per category-change request #${issue_number}.`,
               '',
-              `**Owner (verified):** \`${registeredOwner}\``,
+              ownershipLine,
               `**Requested by:** @${reporter}`,
               '',
-              '**Merging applies the change. Closing rejects it.** Neither happens automatically.',
+              '**Merging applies the change. Closing rejects it.** Neither happens automatically - ' +
+              (verdict === 'verified'
+                ? 'ownership was confirmed, but this still isn\'t a direct commit (see the workflow header for why).'
+                : 'review the ownership note above before deciding.'),
             ];
             const body = lines.join('\n');
 
             const existing = await github.rest.pulls.list({ owner, repo, head: `${owner}:${branch}`, state: 'open' });
             let pr = existing.data[0];
             if (!pr) {
+              const titleSuffix = verdict === 'verified' ? '' : ' (unverified owner)';
               const created = await github.rest.pulls.create({
-                owner, repo, title: `[Plugin] Change ${repoName} category to ${newCategoryLong}`,
+                owner, repo, title: `[Plugin] Change ${repoName} category to ${newCategoryLong}${titleSuffix}`,
                 body, head: branch, base: 'master',
               });
               pr = created.data;

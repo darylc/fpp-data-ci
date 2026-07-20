@@ -332,7 +332,18 @@ jobs:
             // the category, /recheck), not something needing a maintainer's judgement.
             // So there's no outcome where labeling the ISSUE for manual review is
             // actually correct - only ever clean up a stale label from a previous run.
-            const ready = result.pass || isSubmitOverride;
+            //
+            // `&& !!result.repo_name` is load-bearing, not defensive: /submit alone used
+            // to be enough to set ready=true even when plugininfo-fetch/no-repo-url meant
+            // scan_submission.py never resolved a repo_name at all (e.g. a garbled
+            // pluginInfo.json URL like "foo/foo") - the "Add pluginList.json entry on a
+            // branch" step below still ran with an empty REPO_NAME, and
+            // `git checkout -B "add-plugin/"` (empty branch suffix) is an invalid ref,
+            // failing the whole job with exit 128 and emailing a failure notification for
+            // something that was never fixable by retrying. /submit can still override a
+            // real lint finding on a REAL, resolved repo - it just can't manufacture a
+            // repo_name that was never there to begin with.
+            const ready = (result.pass || isSubmitOverride) && !!result.repo_name;
             try {
               await github.rest.issues.removeLabel({ owner, repo, issue_number, name: 'needs-manual-review' });
             } catch (e) {

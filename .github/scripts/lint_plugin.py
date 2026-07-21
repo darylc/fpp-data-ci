@@ -485,19 +485,22 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
                    f"can't conflict with anything apt manages"))
 
     # Bootstrapping a second language/version-package-manager (uv, pipx, nvm,
-    # rustup, conda/miniconda, asdf, volta, Homebrew/Linuxbrew, sdkman) is its own
-    # anti-pattern, distinct from `remote-exec` above. A `curl | sh` install of one
-    # of these already trips remote-exec, but installing the SAME tool through an
-    # otherwise-compliant path (`pip install uv`, `apt-get install pipx`) does not
-    # - and that's exactly what happened in practice (fpp-live-follow / fpp-servo-
-    # calibrator both `pip install --break-system-packages uv`, which passes every
-    # other check here). The problem isn't how it's installed, it's that FPP's
-    # image already ships apt/pip/npm, and a second manager is an unaudited,
-    # unpinned dependency surface fpp_uninstall.sh never accounts for and that
-    # can silently change behavior on a future `git pull` of the plugin with no
-    # version pin at all. Matched on the tool's own install invocation (not just
-    # its installer domain) so this also catches `pip install pipx`-style installs
-    # that don't pipe a remote script into a shell.
+    # rustup, conda/miniconda, asdf, volta, sdkman) is its own anti-pattern,
+    # distinct from `remote-exec` above. A `curl | sh` install of one of these
+    # already trips remote-exec, but installing the SAME tool through an
+    # otherwise-compliant path (`pip install uv`, `apt-get install pipx`) does
+    # not - and that's exactly what happened in practice (fpp-live-follow /
+    # fpp-servo-calibrator both `pip install --break-system-packages uv`,
+    # which passes every other check here). The problem isn't how it's
+    # installed, it's that FPP's image already ships apt/pip/npm, and a second
+    # manager is an unaudited, unpinned dependency surface fpp_uninstall.sh
+    # never accounts for and that can silently change behavior on a future
+    # `git pull` of the plugin with no version pin at all. Matched on the
+    # tool's own install invocation (not just its installer domain) so this
+    # also catches `pip install pipx`-style installs that don't pipe a remote
+    # script into a shell. Homebrew is deliberately excluded: FPP also runs on
+    # macOS (dev/desktop builds), where brew IS the system package manager,
+    # not a bolted-on second one - flagging it there would be exactly backwards.
     hit = first(r'astral\.sh/uv\b|\buv\s+(pip|python|venv|tool)\s+\w|pip3?\s+install\b[^\n]*\buv\b'
                 r'|\bpipx\s+(install|run)\b|pip3?\s+install\b[^\n]*\bpipx\b'
                 r'|nvm-sh/nvm|\.nvm/nvm\.sh|\bnvm\s+install\b'
@@ -505,7 +508,6 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
                 r'|\b(mini|ana)conda3?\b|\bconda\s+(install|create)\b'
                 r'|asdf-vm/asdf|\basdf\s+(install|plugin)\b'
                 r'|get\.volta\.sh|\bvolta\s+install\b'
-                r'|raw\.githubusercontent\.com/Homebrew/install|\bbrew\s+install\b'
                 r'|get\.sdkman\.io|\bsdk\s+install\b')
     if hit:
         out.append(Finding(BEST_PRACTICE, "extra-pkg-manager",
@@ -709,10 +711,26 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
                     hit = (cand, lineno, body.splitlines()[lineno - 1].strip())
                 break
     if hit:
-        out.append(Finding(BEST_PRACTICE, "sudo",
-                   f"uses sudo in a script ({hit[0]}:{hit[1]}: `{hit[2]}`) - install/hooks already "
-                   f"run as root, so remove the sudo call and run the command directly, e.g. "
-                   f"`{hit[2].replace('sudo ', '', 1)}`"))
+        # `sudo -u <user> <cmd>` is a privilege DROP (root -> unprivileged runtime
+        # user, almost always `fpp`), not the redundant escalation the generic
+        # advice below assumes - naively stripping "sudo " would leave a bare
+        # `-u fpp <cmd>` that isn't runnable at all (seen verbatim in an earlier
+        # finding message before this special case existed). Root can switch to
+        # another user without a password anyway, so the direct, no-sudoers-
+        # policy-needed tool for that is `runuser -u <user> -- <cmd>`.
+        m = re.match(r'sudo\s+-u\s+(\S+)\s+(.*)', hit[2])
+        if m:
+            user, rest = m.group(1), m.group(2)
+            out.append(Finding(BEST_PRACTICE, "sudo",
+                       f"uses sudo to drop privileges in a script ({hit[0]}:{hit[1]}: `{hit[2]}`) - "
+                       f"install/hooks already run as root, which can switch to another user "
+                       f"without a password, so there's no need to go through sudo (and its "
+                       f"sudoers policy) for this. Use `runuser -u {user} -- {rest}` instead"))
+        else:
+            out.append(Finding(BEST_PRACTICE, "sudo",
+                       f"uses sudo in a script ({hit[0]}:{hit[1]}: `{hit[2]}`) - install/hooks already "
+                       f"run as root, so remove the sudo call and run the command directly, e.g. "
+                       f"`{hit[2].replace('sudo ', '', 1)}`"))
 
     # --- untrusted request data reaching a dangerous sink --------------------
 

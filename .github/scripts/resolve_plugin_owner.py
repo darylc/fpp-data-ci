@@ -23,7 +23,9 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from lib_plugin_schema import fetch_json, gh_get_contributors, load_pluginlist, parse_github_repo  # noqa: E402
+from lib_plugin_schema import (  # noqa: E402
+    fetch_json, gh_get_contributors, gh_get_pr_mergers, load_pluginlist, parse_github_repo,
+)
 
 
 def main():
@@ -43,7 +45,10 @@ def main():
         src = parse_github_repo((info or {}).get("srcURL", "") or "")
         if src:
             owner, repo = src
-            contributors = gh_get_contributors(owner, repo, token)
+            # Same preference as new_major_release_scan.py: people who've merged someone
+            # else's PR are a stronger authority signal than raw commit-count contributors,
+            # which credit a one-off external submitter the same as an actual maintainer.
+            contributors = gh_get_pr_mergers(owner, repo, token) or gh_get_contributors(owner, repo, token)
 
     print(f"owner={owner or '(unresolved)'} contributors={','.join(contributors) or '(none)'}")
     out = os.environ.get("GITHUB_OUTPUT")

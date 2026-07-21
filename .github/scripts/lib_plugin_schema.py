@@ -207,6 +207,75 @@ def gh_get_contributors(owner: str, repo: str, token: Optional[str], limit: int 
         return []
 
 
+def gh_get_pr_mergers(owner: str, repo: str, token: Optional[str],
+                       scan_limit: int = 100, limit: int = 5) -> list[str]:
+    """Distinct logins with demonstrated write access to owner/repo, found by
+    walking first-parent history from HEAD (the same mainline `git log
+    --first-parent` shows) - a stronger maintainer signal than
+    gh_get_contributors for an org repo that takes outside PRs: a one-off
+    external contributor's commit inflates the contributor count exactly as
+    much as a real maintainer's.
+
+    Every commit on the first-parent chain required write access to get
+    there, however it got there: a merge commit only exists because someone
+    with merge rights created it (and its `author` field IS that person, not
+    the PR's submitter), while a plain commit reachable via first-parent was
+    pushed directly to the branch - only possible with write access. A merged
+    PR's OWN commits are correctly excluded either way: they're only reachable
+    via the merge commit's second parent, never its first, so the walk never
+    touches them.
+
+    This starts from (and subsumes) an earlier version of this function that
+    only credited merge-commit authors - that missed FalconChristmas' most
+    tenured contributors entirely (cpinkham on fpp-BigButtons,
+    computergeek1507 on fpp-brightness: both write directly to the branch,
+    never merging anyone else's PR in these repos, so a mergers-only view saw
+    them as strangers). The first-parent walk catches both cases in one pass,
+    with no separate self-merge check needed - direct-push or merge, everyone
+    it finds already proved write access by definition.
+
+    One API call fetches up to `scan_limit` recent commits (each with its full
+    parent SHA list); the first-parent chain is then walked locally with no
+    further requests, starting at the batch's first entry (HEAD, since the
+    list endpoint returns newest-first) and repeatedly following
+    commit.parents[0].sha within the fetched batch. The walk stops early if a
+    parent isn't in the fetched batch (older than `scan_limit` commits back) -
+    fine for finding currently-active maintainers, not meant to cover a repo's
+    entire history. `limit` bounds the returned list. Public endpoint, no
+    special access needed. Best-effort - returns [] on any failure, never
+    raises.
+    """
+    api = f"https://api.github.com/repos/{owner}/{repo}/commits?per_page={scan_limit}"
+    headers = {"User-Agent": USER_AGENT, "Accept": "application/vnd.github+json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        req = urllib.request.Request(api, headers=headers)
+        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
+            commits = json.loads(resp.read().decode("utf-8", "replace"))
+    except Exception:  # noqa: BLE001
+        return []
+    if not isinstance(commits, list) or not commits:
+        return []
+    by_sha = {c["sha"]: c for c in commits if isinstance(c, dict) and c.get("sha")}
+    authors: list[str] = []
+    seen_shas: set[str] = set()
+    cur = commits[0]
+    while isinstance(cur, dict) and cur.get("sha") not in seen_shas:
+        seen_shas.add(cur["sha"])
+        author = cur.get("author") or {}
+        login = author.get("login")
+        if login and author.get("type") != "Bot" and login not in authors:
+            authors.append(login)
+            if len(authors) >= limit:
+                break
+        parents = cur.get("parents") or []
+        if not parents:
+            break
+        cur = by_sha.get(parents[0].get("sha"))
+    return authors
+
+
 def list_open_issues(gh_repo: str, label: str, token: Optional[str]) -> list[dict]:
     """Open issues on `gh_repo` (\"owner/repo\") carrying `label`. One page (100) is
     plenty for this repo's issue volume - not worth paginating.

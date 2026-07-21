@@ -175,7 +175,13 @@ def scan_plugin(entry, target, plugins_dir, token, schema):
             # top contributors instead, as the individuals actually likely to see this.
             owner_is_org = (meta.get("owner") or {}).get("type") == "Organization"
             if owner_is_org:
-                maintainer_candidates = lib.gh_get_contributors(owner, repo, token)
+                # Prefer people who've actually merged someone else's PR (real
+                # gatekeeping authority) over raw commit-count contributors, which
+                # credits one-off external submitters same as maintainers. Falls
+                # back to contributors when there's no cross-merge history to go
+                # on (e.g. a repo where only its own author ever merges).
+                maintainer_candidates = (lib.gh_get_pr_mergers(owner, repo, token)
+                                         or lib.gh_get_contributors(owner, repo, token))
 
     # --- static compliance lint (needs a clone) -----------------------------
     linted = False

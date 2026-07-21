@@ -484,6 +484,38 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
                    f"`/usr/local/lib/python3.x/dist-packages`, which isn't tracked by dpkg, so it "
                    f"can't conflict with anything apt manages"))
 
+    # Bootstrapping a second language/version-package-manager (uv, pipx, nvm,
+    # rustup, conda/miniconda, asdf, volta, Homebrew/Linuxbrew, sdkman) is its own
+    # anti-pattern, distinct from `remote-exec` above. A `curl | sh` install of one
+    # of these already trips remote-exec, but installing the SAME tool through an
+    # otherwise-compliant path (`pip install uv`, `apt-get install pipx`) does not
+    # - and that's exactly what happened in practice (fpp-live-follow / fpp-servo-
+    # calibrator both `pip install --break-system-packages uv`, which passes every
+    # other check here). The problem isn't how it's installed, it's that FPP's
+    # image already ships apt/pip/npm, and a second manager is an unaudited,
+    # unpinned dependency surface fpp_uninstall.sh never accounts for and that
+    # can silently change behavior on a future `git pull` of the plugin with no
+    # version pin at all. Matched on the tool's own install invocation (not just
+    # its installer domain) so this also catches `pip install pipx`-style installs
+    # that don't pipe a remote script into a shell.
+    hit = first(r'astral\.sh/uv\b|\buv\s+(pip|python|venv|tool)\s+\w|pip3?\s+install\b[^\n]*\buv\b'
+                r'|\bpipx\s+(install|run)\b|pip3?\s+install\b[^\n]*\bpipx\b'
+                r'|nvm-sh/nvm|\.nvm/nvm\.sh|\bnvm\s+install\b'
+                r'|sh\.rustup\.rs|\brustup\s+(install|default|toolchain)\b'
+                r'|\b(mini|ana)conda3?\b|\bconda\s+(install|create)\b'
+                r'|asdf-vm/asdf|\basdf\s+(install|plugin)\b'
+                r'|get\.volta\.sh|\bvolta\s+install\b'
+                r'|raw\.githubusercontent\.com/Homebrew/install|\bbrew\s+install\b'
+                r'|get\.sdkman\.io|\bsdk\s+install\b')
+    if hit:
+        out.append(Finding(BEST_PRACTICE, "extra-pkg-manager",
+                   f"installs a second package/version manager on top of what FPP's image already "
+                   f"provides ({hit[0]}:{hit[1]}: `{hit[2]}`) - apt/pip/npm already cover system and "
+                   f"language packages; a bolted-on manager (uv, pipx, nvm ...) is undesirable. "
+                   f"If there's a genuine need it can't cover (e.g. a Python/Node version the OS image "
+                   f"doesn't ship), say so explicitly via `/submit` instead of adding a manager "
+                   f"silently"))
+
     # Reading/parsing FPP's raw core config directly (the settings file, channel
     # outputs) is fragile - use getSetting()/$settings/the API. Writing your OWN
     # config via WriteSettingToFile(key, val, pluginName) is fine and NOT flagged.
@@ -906,12 +938,28 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
     # there's no local checkout yet at that point). Neither present => initials fallback
     # everywhere. See www/api/controllers/plugin.php's PluginServeIcon().
     has_icon_url = bool((info or {}).get("iconURL"))
-    if "icon.png" not in lower and not has_icon_url:
+    has_icon_png = "icon.png" in lower
+    if not has_icon_png and not has_icon_url:
         out.append(Finding(BEST_PRACTICE, "no-icon",
                    "no icon.png in the repo root and no iconURL in pluginInfo.json - the Plugin "
                    "Manager will show your initials instead of an icon. A local icon.png (128x128 "
                    "or 256x256, repo root) is preferred since it renders offline once installed; "
                    "iconURL is the fallback and the only option shown before install"))
+    elif has_icon_png and not has_icon_url:
+        out.append(Finding(BEST_PRACTICE, "no-iconurl",
+                   "icon.png exists but pluginInfo.json has no iconURL - the local icon only "
+                   "renders after install, so the pre-install Plugin Manager listing (which has "
+                   "no local checkout yet) still shows your initials. Add iconURL pointing at the "
+                   "repo's own raw file, e.g. "
+                   "`https://raw.githubusercontent.com/<owner>/<repo>/<branch>/icon.png`"))
+    elif has_icon_url and not has_icon_png:
+        out.append(Finding(BEST_PRACTICE, "no-local-icon",
+                   "iconURL is set but there's no icon.png in the repo root - post-install, the "
+                   "Plugin Manager has to fetch the icon over the network every time instead of "
+                   "reading it off disk, so it goes back to showing initials if the box is offline "
+                   "or the URL/repo ever moves. Add a local icon.png (128x128 or 256x256, repo "
+                   "root) so it renders offline once installed; keep iconURL as the pre-install "
+                   "fallback"))
 
     # installs a systemd unit but ships no uninstall script
     if first(r'/etc/systemd/system/|systemctl\s+enable') and \
@@ -998,6 +1046,74 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
                    f"background process, poll for the actual condition (e.g. the PID file existing, "
                    f"or the port accepting connections) with a short bounded retry loop instead of a "
                    f"flat sleep"))
+
+    # Re-running the plugin's OWN fpp_install.sh/fpp_upgrade.sh from inside a
+    # start/stop hook is the same class as blocking-build-in-hook, just worse:
+    # instead of one compile step it re-runs the WHOLE install (apt/pip/uv
+    # installs, systemd unit + Apache conf writes, network downloads) every
+    # boot the guard condition trips - seen in practice in a preStart.sh that
+    # self-heals a systemd unit wiped by an OS upgrade. If a genuine self-heal
+    # is needed, run it detached (e.g. `systemd-run` or `nohup ... &`) so fppd
+    # starts immediately instead of waiting on it, or use FPP's actual
+    # post-os-upgrade mechanism instead of reinventing one in a start hook.
+    hit = None
+    for dirpath, dirnames, filenames in os.walk(root):
+        if ".git" in dirnames:
+            dirnames.remove(".git")
+        for fn in filenames:
+            if fn.startswith(("preStart", "postStart", "preStop", "postStop")):
+                p = os.path.join(dirpath, fn)
+                for i, line in enumerate(_read(p).splitlines(), 1):
+                    if _is_comment_line(line):
+                        continue
+                    if re.search(r'\b(bash|sh|\.\/)?\s*["\']?[\w/${}.-]*fpp_(install|upgrade)\.sh\b', line):
+                        hit = (os.path.relpath(p, root), i, line.strip())
+                        break
+                if hit:
+                    break
+        if hit:
+            break
+    if hit:
+        out.append(Finding(BLOCKER, "install-in-hook",
+                   f"runs the plugin's own install/upgrade script from a lifecycle hook ({hit[0]}:"
+                   f"{hit[1]}: `{hit[2]}`) - this re-executes the entire install (package installs, "
+                   f"service/proxy setup, network downloads) synchronously every time the hook's "
+                   f"guard condition trips, blocking fppd startup for however long that takes. Run "
+                   f"any genuine self-heal step detached from the hook (e.g. `systemd-run` or "
+                   f"`nohup ... &`) instead of inline, or use FPP's actual post-os-upgrade mechanism "
+                   f"rather than reinventing one in preStart/postStart"))
+
+    # A bare `git pull`/`fetch`/`clone` in a start/stop hook is an unbounded
+    # network call with no timeout (git has no default one) blocking fppd
+    # startup/shutdown if the network stalls - the git-specific counterpart to
+    # no-timeout above, which only looks at curl/requests. Seen paired with
+    # install-in-hook in practice (self-heal logic pulls latest code before
+    # reinstalling), but flagged independently since either half is a problem
+    # on its own.
+    hit = None
+    for dirpath, dirnames, filenames in os.walk(root):
+        if ".git" in dirnames:
+            dirnames.remove(".git")
+        for fn in filenames:
+            if fn.startswith(("preStart", "postStart", "preStop", "postStop")):
+                p = os.path.join(dirpath, fn)
+                for i, line in enumerate(_read(p).splitlines(), 1):
+                    if _is_comment_line(line):
+                        continue
+                    if re.search(r'\bgit\s+(-C\s+\S+\s+)?(pull|fetch|clone)\b', line) \
+                       and not re.search(r'\btimeout\s+[0-9]', line):
+                        hit = (os.path.relpath(p, root), i, line.strip())
+                        break
+                if hit:
+                    break
+        if hit:
+            break
+    if hit:
+        out.append(Finding(BEST_PRACTICE, "git-network-call-in-hook",
+                   f"unbounded git network call in a lifecycle hook ({hit[0]}:{hit[1]}: `{hit[2]}`) "
+                   f"- git has no built-in timeout, so a stalled connection here blocks fppd "
+                   f"startup/shutdown indefinitely. Wrap it with `timeout <seconds> git ...` or move "
+                   f"it out of the hook entirely"))
 
     # error_reporting(0) silences fatal/parse errors instead of letting them
     # surface in FPP's log - a broken plugin fails silently instead of visibly.

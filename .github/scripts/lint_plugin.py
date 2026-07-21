@@ -1127,7 +1127,7 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
         if hit:
             break
     if hit:
-        out.append(Finding(BEST_PRACTICE, "git-network-call-in-hook",
+        out.append(Finding(BLOCKER, "git-network-call-in-hook",
                    f"unbounded git network call in a lifecycle hook ({hit[0]}:{hit[1]}: `{hit[2]}`) "
                    f"- git has no built-in timeout, so a stalled connection here blocks fppd "
                    f"startup/shutdown indefinitely. Wrap it with `timeout <seconds> git ...` or move "

@@ -250,7 +250,7 @@ def issue_body(r, target, draft=True):
     if r.get("owner") and r.get("repo"):
         L.append(f"Repo: https://github.com/{r['owner']}/{r['repo']}")
     if r["owner"]:
-        mention = "not @-mentioned in this dry run" if draft else "not @-mentioned - see MENTION_OWNER"
+        mention = "not @-mentioned in this dry run" if draft else "not @-mentioned automatically"
         if r.get("owner_is_org"):
             # An org login isn't a person - @-mentioning it doesn't notify anyone
             # who isn't already watching the repo. maintainer_candidates come from

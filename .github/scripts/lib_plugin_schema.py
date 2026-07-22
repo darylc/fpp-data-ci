@@ -8,7 +8,6 @@ slow/dead host can't hang the CI job.
 from __future__ import annotations
 
 import json
-import os
 import re
 import urllib.error
 import urllib.request

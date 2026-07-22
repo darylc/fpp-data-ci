@@ -951,6 +951,18 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
     if not any(n.startswith("readme") for n in lower):
         out.append(Finding(OPTIONAL, "no-readme", "no README file"))
 
+    # Leftover copies of fpp-plugin-Template's own meta-docs. PLUGIN_GUIDELINES.md and
+    # PLUGININFO_FORMAT.md document how to build ANY FPP plugin - they aren't specific
+    # to this one, and were never meant to ship inside a real plugin repo. Forgetting to
+    # delete them after forking the template is an easy miss, and leaves every installer
+    # looking at generic template docs instead of anything about this actual plugin.
+    leftover_template_docs = sorted(n for n in names if n.lower() in ("plugin_guidelines.md", "plugininfo_format.md"))
+    if leftover_template_docs:
+        out.append(Finding(BEST_PRACTICE, "leftover-template-docs",
+                   f"{', '.join(leftover_template_docs)} - these are fpp-plugin-Template's own docs on "
+                   "how to build a plugin in general, not part of your plugin. Delete them from your "
+                   "repo; they should only exist in fpp-plugin-Template itself."))
+
     # Icon: FPP prefers a local icon.png (renders offline once installed) and falls back
     # to iconURL (also the ONLY option for a pre-install Plugin Manager thumbnail, since
     # there's no local checkout yet at that point). Neither present => initials fallback

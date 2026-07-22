@@ -1,4 +1,4 @@
-"""Static compliance linter for a single FPP plugin working tree.
+"""Static plugin linter for a single FPP plugin working tree.
 
 Runs the guideline/hygiene checks (the "areas of concern / optimisation"
 surfaced in a release-readiness scan) against a plugin's cloned directory.
@@ -926,10 +926,10 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
                    f"curl), the `'timeout'` key (PHP stream contexts), or `timeout=` (Python "
                    f"`requests`)"))
 
-    # repoName must match the actual GitHub repo name (CONTRIBUTING.md: "must match
-    # your GitHub repo name and your pluginList.json entry name"). validate_pluginlist.py
-    # already checks the pluginList.json half of that (repoName vs. the registered
-    # listing name); this is the other half, which nothing previously checked. It's easy
+    # repoName must match the actual GitHub repo name (PLUGININFO_FORMAT.md's repoName
+    # row, in fpp-plugin-Template, states this). validate_pluginlist.py already checks
+    # the pluginList.json half of that (repoName vs. the registered listing name); this
+    # is the other half, which nothing previously checked. It's easy
     # to miss because nothing breaks visibly - FPP installs into
     # ${PLUGINDIR}/${repoName} regardless of what the repo is actually called (see
     # InstallPluginFromInfo() in www/api/controllers/plugin.php), so a mismatch only
@@ -940,7 +940,7 @@ def lint_plugin_dir(root: str, repo_name: str | None = None, info: dict | None =
         if declared and src and declared.lower() != src[1].lower():
             out.append(Finding(BEST_PRACTICE, "reponame-mismatch",
                        f"pluginInfo.json's repoName (`{declared}`) doesn't match the actual GitHub "
-                       f"repo name (`{src[1]}`, parsed from srcURL) - CONTRIBUTING.md requires them "
+                       f"repo name (`{src[1]}`, parsed from srcURL) - PLUGININFO_FORMAT.md requires them "
                        f"to match. Rename the GitHub repo to `{declared}` (Settings > repository name) "
                        f"or change repoName to `{src[1]}`, whichever is the real name here - just make "
                        f"sure pluginList.json's listing name is updated to match too."))

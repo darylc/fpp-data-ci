@@ -1,9 +1,9 @@
-"""Major-release plugin compliance & certification scanner (new-major-release backbone).
+"""Major-release plugin check & certification scanner (new-major-release backbone).
 
 For a target FPP major, walks every entry in pluginList.json and, per plugin:
   * evaluates whether any versions[] entry declares compatibility with the major
     (the implicit "certified for FPP <major>" signal - D21),
-  * runs the static compliance linter (lint_plugin.py) over its cloned tree,
+  * runs the static plugin linter (lint_plugin.py) over its cloned tree,
   * gathers repo metadata (Issues enabled?, archived?, last push) best-effort
     from the GitHub API,
 and emits:
@@ -183,7 +183,7 @@ def scan_plugin(entry, target, plugins_dir, token, schema):
                 maintainer_candidates = (lib.gh_get_pr_mergers(owner, repo, token)
                                          or lib.gh_get_contributors(owner, repo, token))
 
-    # --- static compliance lint (needs a clone) -----------------------------
+    # --- static plugin lint (needs a clone) -----------------------------
     linted = False
     if plugin_dir:
         linted = True

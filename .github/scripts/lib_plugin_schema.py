@@ -65,8 +65,9 @@ def resolve_repo_name(value: str) -> str:
     (`raw.githubusercontent.com/<owner>/<repo>/<branch>/pluginInfo.json`), or just
     `<owner>/<repo>` shorthand with no host at all (what the guided page's repo-input
     parser also accepts). Be forgiving rather than failing the request outright:
-    `repoName` is required (by CONTRIBUTING.md) to match the GitHub repo name, so the
-    repo segment of any of these shapes IS the repoName.
+    `repoName` is required (see PLUGININFO_FORMAT.md, in fpp-plugin-Template) to
+    match the GitHub repo name, so the repo segment of any of these shapes IS the
+    repoName.
     """
     v = (value or "").strip()
     if not v:

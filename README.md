@@ -8,26 +8,22 @@ This repository is the data backing FPP's Plugin Manager:
 - **`pluginCategories.json`** - the canonical category list plugins can tag
   themselves with.
 
-## Submitting a plugin
+## Get your plugin listed
 
-See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the full guide - pre-submission
-guidelines, the `pluginInfo.json` contract, the `pluginList.json` entry
-format, and what CI checks automatically. Two ways in:
+Start at **[Submit a plugin](https://darylc.github.io/fpp-data-ci/submit_new_plugin/)**
 
-1. **[Submit a plugin](https://darylc.github.io/fpp-data-ci/submit_new_plugin/)**
-   (Issue Form, no git needed) - it fills in the form for you and
-   encrypts your contact email.
-2. **Pull Request** - add your entry to `pluginList.json` directly; a CI
-   check validates it and comments on the PR.
+See **[PLUGINS.md](PLUGINS.md)** for the submission guidelines and what
+the automated plugin check covers.
 
-Building the plugin itself? Start from
-[fpp-plugin-Template](https://github.com/FalconChristmas/fpp-plugin-Template)
-- it has the `pluginInfo.json` format reference, plugin guidelines, and a
+Building the plugin itself? Start at
+[fpp-plugin-Template](https://github.com/FalconChristmas/fpp-plugin-Template) -
+it has the `pluginInfo.json` format reference, the plugin guidelines, and a
 working skeleton to fork.
 
 ## Removing a plugin
 
-Start at [**Request Plugin Removal**](https://darylc.github.io/fpp-data-ci/submit_remove_plugin/),
-which fills in the repoName for you (no email involved here, so it's a single step,
-unlike the submission flow above). Existing installs are unaffected; the entry is just
-removed from `pluginList.json`.
+Start at [**Request Plugin Removal**](https://darylc.github.io/fpp-data-ci/submit_remove_plugin/). Existing installs are unaffected; the entry is just removed from `pluginList.json`.
+
+## Changing a plugin's category
+
+Start at [**Request Category Change**](https://darylc.github.io/fpp-data-ci/change_plugin_category/), which lets you pick a new category from the canonical list in `pluginCategories.json`.

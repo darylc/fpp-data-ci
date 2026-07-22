@@ -172,7 +172,7 @@ def build_markdown(report: Report, num_targets, total) -> str:
             lines.append(f"- **{f.entry}** - {f.message}")
         lines.append("")
     lines.append("_Errors block the check; warnings do not. See "
-                 "[CONTRIBUTING.md](../blob/master/CONTRIBUTING.md) for the schema._")
+                 "[PLUGINS.md](../blob/master/PLUGINS.md) for the format._")
     return "\n".join(lines) + "\n"
 
 

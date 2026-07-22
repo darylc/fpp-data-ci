@@ -3,7 +3,7 @@
 Derives the clone URL + branch from each entry's pluginInfo URL
 (raw.githubusercontent.com/<owner>/<repo>/<ref>/pluginInfo.json). Failures are
 reported but don't stop the run - the new-major-release scanner still reports a
-plugin it couldn't clone (metadata-only). Used by the compliance-scan workflow.
+plugin it couldn't clone (metadata-only). Used by the plugin-check workflow.
 
 Usage: clone_plugins.py --plugin-list pluginList.json --out plugins [--limit N]
 """

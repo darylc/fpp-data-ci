@@ -1,5 +1,5 @@
 # Allows `/recheck` directly on a plugin's listing PR (opened by scan-new-submission.yml
-# once a submission is ready), re-running the compliance scan against the submitter's
+# once a submission is ready), re-running the plugin check against the submitter's
 # repo's CURRENT state and posting fresh findings as a PR comment.
 #
 # WHY: scan-new-submission.yml closes the original issue once the PR opens, saying
@@ -139,7 +139,7 @@ jobs:
           print(f"plugininfo_url={url}")
           EOF
 
-      - name: Run compliance scan
+      - name: Run plugin check
         if: steps.authz.outputs.ok == 'true' && steps.lookup.outputs.plugininfo_url != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -178,7 +178,7 @@ jobs:
             const lines = ['### 🔄 Recheck', ''];
             if (fields.length) lines.push(...fields, '');
             if (cloneFailed) {
-              lines.push(`⚠️ Could not clone the repo to run the compliance checks (requested by @${commenter}) - ` +
+              lines.push(`⚠️ Could not clone the repo to run the plugin checks (requested by @${commenter}) - ` +
                          'this is often transient. Comment `/recheck` to try again.');
             } else if (result.pass) {
               lines.push(`✅ Requested by @${commenter} - no blocking issues found.`);

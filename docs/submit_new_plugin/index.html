@@ -70,8 +70,8 @@
 
   <p>
     Please read the
-    <!-- SANDBOX URL - swap to https://github.com/FalconChristmas/fpp-data/blob/master/CONTRIBUTING.md upstream. -->
-    <a href="https://github.com/darylc/fpp-data-ci/blob/master/CONTRIBUTING.md" target="_blank" rel="noopener">plugin guidelines</a>
+    <!-- SANDBOX URL - swap to https://github.com/FalconChristmas/fpp-data/blob/master/PLUGINS.md upstream. -->
+    <a href="https://github.com/darylc/fpp-data-ci/blob/master/PLUGINS.md" target="_blank" rel="noopener">plugin guidelines</a>
     before submitting - they cover what's required for a listing to be accepted.
   </p>
 
@@ -157,7 +157,7 @@ const TEMPLATE = "plugin-submission.yml";
 // FPP's private contacts repo, so only maintainers can decrypt.
 const PUBLIC_JWK = {
   "kty": "RSA",
-  "n": "nHbDZjS1JDfRBEgK02APtc5pzTHFaAF4kqZlQaRYizebiE68fEvkzOkNm_FYkZBmGat9_UUVduyPc-98zIayVH9bnIz01WdH3jmSK46V7cqL6Cz6IL8ZXKSHlLIkO-2_A2nooLO2gThTtClAAlM8RctC0QhqC972VilNW5uj5cp_dlxc845TumRNM6l55LKuL--3F8gxBU1n6gPcgvxto7HVfhDEKCRa4iC5aQZl8ua1ZzIGcPKmiSPYIa6n3mETfXffxJo8-S_J2QAWMW-4ta5S0rgaIu0GZvBNQ5Pm7LiQ_Vg_Bf1zvyakZUVSN_NzcZHkeIczHY_y7w_DfiMab6SEo2b_lcw81wX89o85s5ALIaedy6pkx1aA0D8YmCqI4Svw_qVZ8o2lU3tGbIsNMqd1ww1Co1nDqP_zBOGHAzmtw25UX1p6BpTWE_mh37IcVcfFKYkqYWMNf8WrPwTlcAKddfsdeXdw237hq-czIAC7qrLpfn_vKDzUwqLrEeav0DJurhOGeMP-PxgOYHKB4-egynne9wJLNkbxJwxHHl-nl3hzJ6LfU6sWchN_DWs4ubifepX5rtqySAilSHm2y-zw02SCbdhQ96G-xjzCHe7c1HTctgowRJwCkSRQ10EqfP5ALHHVA4B0HoaKOnjMno9sfHmeJlwiKs0ITa1MPzM",
+  "n": "y4fjfc-KTxeShku0IINEE06dgkXG-PmdxW-vC2UsJ7s1Mp1LpNcT-Ly6FYad9SatLz_r4oRuKD4ezhGepZgj6FxLn6-XK9PuXfFCNPPNcxgH307daqIRNixLvnXGVt679KdCQDJlYn1FBaG9Mcf0fCwFDqKvq5Ad6LA1wFocNqX7HMZ2nAMO8qc4lf6S39YVl3vEnsjUuRIr9mkVhpn2QWz3hbFMalTjnrqKqE-UvCVrvOpHyYF1Gdx-6quD4a1L6hxlImvUSGO5kQl0cleujNVqSFeOLaFtEpQ5Ym00TpvRT46uulTVl1xOjWJDFd_ifkHusLfCdXDhyKSJs-0Trw",
   "e": "AQAB",
   "alg": "RSA-OAEP-256",
   "ext": true,
@@ -269,11 +269,15 @@ async function generate() {
     const key = await crypto.subtle.importKey(
       "jwk", PUBLIC_JWK, { name: "RSA-OAEP", hash: "SHA-256" }, false, ["encrypt"]
     );
-    // repo is encrypted alongside the email so a token lifted from someone else's
-    // public issue can't be replayed against a different plugin.
-    const payload = JSON.stringify({ v: 1, repo: repoName, email, ts: new Date().toISOString() });
+    // Only the email is encrypted - repo (from plugininfo_url, already a public
+    // field on the issue) and the submission date (the issue's own created_at) are
+    // both available unencrypted elsewhere, so there's no reason to also carry them
+    // in the ciphertext. Trade-off: a token lifted off someone else's public issue
+    // and replayed onto a different plugin isn't caught by the crypto anymore, since
+    // decryption no longer binds email to repo - that's left to the maintainer's
+    // manual review before merge (see the "what happens after" list above).
     const ct = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, key,
-                                           new TextEncoder().encode(payload));
+                                           new TextEncoder().encode(email));
     const token = PREFIX + "\n" + wrap(b64(ct));
 
     // Issue Forms prefill from query params keyed by field id. Checkboxes can't be

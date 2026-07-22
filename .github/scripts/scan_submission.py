@@ -1,4 +1,4 @@
-"""Compliance scan for a brand-new plugin submission issue.
+"""Plugin check for a brand-new plugin submission issue.
 
 Reuses the same checks as the retroactive fpp<major> new-major-release scan
 (lint_plugin.py, the pluginInfo.json schema check, and the repo-metadata checks - all

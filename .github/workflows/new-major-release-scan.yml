@@ -1,7 +1,7 @@
-# Major-release plugin compliance & certification scan (manual).
+# Major-release plugin check & certification scan (manual).
 #
 # WHAT THIS IS: run in the lead-up to an FPP major release. It clones every plugin
-# in pluginList.json, runs the compliance linter + FPP-<major> compatibility check,
+# in pluginList.json, runs the plugin linter + FPP-<major> compatibility check,
 # and produces:
 #   * a dashboard (one status row per plugin)
 #   * a per-plugin DRAFT tracking-issue body
@@ -68,7 +68,7 @@ jobs:
       - name: Upload dashboard + draft issues
         uses: actions/upload-artifact@v4
         with:
-          name: fpp${{ inputs.target_major }}-compliance
+          name: fpp${{ inputs.target_major }}-plugin-check
           path: out/
 
       - name: Job summary

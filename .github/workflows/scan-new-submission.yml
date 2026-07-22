@@ -1,9 +1,9 @@
-# Compliance scan for brand-new plugin submissions.
+# Plugin check for brand-new plugin submissions.
 #
 # WHY: check-submission-token.yml only guards the contact token; nothing else was
 # checked automatically on a new "Submit a plugin" issue before a human reviewed it
 # by hand. This reuses the same linter (lint_plugin.py) and pluginInfo.json schema
-# the fpp<major> compliance new-major-release scan already runs against LISTED plugins, but gates
+# the fpp<major> new-major-release scan already runs against LISTED plugins, but gates
 # harder - see scan_submission.py's docstring: a brand-new submission has no
 # grandfathering, so BEST_PRACTICE findings block here too, not just BLOCKER.
 #
@@ -161,7 +161,7 @@ jobs:
             core.setOutput('plugininfo_url', infoUrl === '_No response_' ? '' : infoUrl);
             core.setOutput('category', category === '_No response_' ? '' : category);
 
-      - name: Run compliance scan
+      - name: Run plugin check
         if: steps.authz.outputs.ok == 'true' && steps.extract.outputs.plugininfo_url != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # for the archived/issues-disabled/bugURL check
@@ -197,7 +197,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const MARKER = '<!-- submission-compliance-scan -->';
+            const MARKER = '<!-- submission-plugin-check -->';
             const result = JSON.parse(fs.readFileSync('scan-result.json', 'utf8'));
 
             const badge = { blocker: '🛑', 'best-practice': '⚠️', optional: '💡' };
@@ -267,19 +267,19 @@ jobs:
 
             let msg;
             if (cloneFailed) {
-              msg = ['### ⚠️ Automated compliance scan: could not run',
+              msg = ['### ⚠️ Automated plugin check: could not run',
                      ''];
               if (fieldBlock) msg.push(...fieldBlock, '');
-              msg.push(`@${reporter} could not clone your repo to run the compliance checks — this is often ` +
+              msg.push(`@${reporter} could not clone your repo to run the plugin checks — this is often ` +
                        'transient. Comment `/recheck` to try again. If it keeps failing, check that the repo ' +
                        'is public and reachable.');
             } else if (result.pass) {
-              msg = ['### ✅ Automated compliance scan: passed',
+              msg = ['### ✅ Automated plugin check: passed',
                      ''];
               if (fieldBlock) msg.push(...fieldBlock, '');
               msg.push(`@${reporter} no blocking issues found. A maintainer will still review this by hand before it's added to \`pluginList.json\`.`);
             } else {
-              msg = ['### 🛑 Automated compliance scan: needs changes',
+              msg = ['### 🛑 Automated plugin check: needs changes',
                      ''];
               if (fieldBlock) msg.push(...fieldBlock, '');
               msg.push(`@${reporter} found ${result.num_blocking} issue(s) this must be fixed before the plugin can be listed:`,
@@ -467,7 +467,7 @@ jobs:
             }
             lines.push('');
             if (result.pass) {
-              lines.push('✅ The automated compliance scan passed - no blocking issues found.', '');
+              lines.push('✅ The automated plugin check passed - no blocking issues found.', '');
             } else {
               lines.push(
                 `⚠️ **Opened despite ${blocking.length} unresolved finding(s) below** - the reporter used ` +
@@ -482,8 +482,8 @@ jobs:
               'this PR existed.', '',
               '**Merging is entirely up to a maintainer\'s judgement** - this PR being open is not an approval, ' +
               'especially if it was opened via `/submit` over unresolved findings above.', '',
-              `_A repo maintainer (or @${reporter}) can comment \`/recheck\` here to re-run the compliance ` +
-              'scan against the repo\'s current state and refresh the findings above._');
+              `_A repo maintainer (or @${reporter}) can comment \`/recheck\` here to re-run the plugin ` +
+              'check against the repo\'s current state and refresh the findings above._');
             const body = lines.join('\n');
 
             const existing = await github.rest.pulls.list({ owner, repo, head: `${owner}:${branch}`, state: 'open' });

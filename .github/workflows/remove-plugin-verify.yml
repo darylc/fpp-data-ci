@@ -43,7 +43,7 @@
 # or error) and the submitter believes that's wrong, `/submit` flags the issue
 # `needs-manual-review` for a maintainer to decide by hand instead - same idea
 # as scan-new-submission.yml's override, applied to the ownership question here
-# instead of a compliance scan. `unconfirmed` specifically gets MORE than just a
+# instead of a plugin check. `unconfirmed` specifically gets MORE than just a
 # label: `/submit` (or removal-escalation-sweep.yml's 7-day timeout, for anyone
 # who doesn't use it) opens a PR removing the entry from pluginList.json, so a
 # maintainer only has to merge or close it rather than edit the file by hand.

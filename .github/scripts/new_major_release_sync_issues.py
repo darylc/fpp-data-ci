@@ -100,7 +100,7 @@ def main():
     created = updated = closed = noop = 0
     for r in plugins:
         name = r["name"]
-        title = f"[FPP {target}] {name} - compatibility & compliance"
+        title = f"[FPP {target}] {name} - compatibility & plugin check"
         body = issue_body(r, target, draft=False)
         iss = existing.get(name)
 
